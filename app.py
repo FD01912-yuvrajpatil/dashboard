@@ -50,16 +50,16 @@ VERIFY_SSL = os.environ.get("DBX_VERIFY_SSL", "true").lower() != "false"
 CONFIG = {
     # Your Databricks workspace URL, e.g. https://dbc-abc123.cloud.databricks.com
     # On Databricks Apps this is provided automatically via DATABRICKS_HOST.
-    "DATABRICKS_HOST": get_env("DATABRICKS_HOST", "https://REPLACE-WORKSPACE.cloud.databricks.com"),
+    "DATABRICKS_HOST": get_env("DATABRICKS_HOST", "https://adb-7405607280061101.1.azuredatabricks.net"),
 
     # ---- DUMMY IDs — replace with your real values --------------------------
-    "WORKSPACE_ID":     get_env("DATABRICKS_WORKSPACE_ID", "1234567890123456"),   # dummy
-    "GENIE_SPACE_ID":   get_env("GENIE_SPACE_ID",          "01ef0a1b2c3d4e5f6a7b8c9d0e1f2a3b"),  # dummy
-    "WAREHOUSE_ID":     get_env("DATABRICKS_WAREHOUSE_ID", "0123456789abcdef"),   # dummy SQL warehouse
+    "WORKSPACE_ID":     get_env("DATABRICKS_WORKSPACE_ID", "7405610968279077"),   # dummy
+    "GENIE_SPACE_ID":   get_env("GENIE_SPACE_ID",          "8f7b505b0b1b4ed69a0d00061abb907c"),  # dummy
+    "WAREHOUSE_ID":     get_env("DATABRICKS_WAREHOUSE_ID", "f10214f943eb8d3a"),   # dummy SQL warehouse
 
     # Auth token. On Databricks Apps, prefer the injected OAuth token; locally
     # you can drop a PAT here or in the DATABRICKS_TOKEN env var.
-    "DATABRICKS_TOKEN": get_env("DATABRICKS_TOKEN", "dapiXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"),  # dummy
+    "DATABRICKS_TOKEN": get_env("DATABRICKS_TOKEN", "dapi292b54792c2b1cdfbe5096af695d0421-3"),  # dummy
 
     # Unity Catalog location of your two tables.
     "CATALOG": get_env("DBX_CATALOG", "ernest_dashbord_poc"),
