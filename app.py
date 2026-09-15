@@ -54,7 +54,7 @@ CONFIG = {
 
     # ---- DUMMY IDs — replace with your real values --------------------------
     "WORKSPACE_ID":     get_env("DATABRICKS_WORKSPACE_ID", "7405610968279077"),   # dummy
-    "GENIE_SPACE_ID":   get_env("GENIE_SPACE_ID",          "8f7b505b0b1b4ed69a0d00061abb907c"),  # dummy
+    "GENIE_SPACE_ID":   get_env("GENIE_SPACE_ID",          "01f19fd047b01ddaa13e58c7d48db5a5"),  # dummy
     "WAREHOUSE_ID":     get_env("DATABRICKS_WAREHOUSE_ID", "f10214f943eb8d3a"),   # dummy SQL warehouse
 
     # Auth token. On Databricks Apps, prefer the injected OAuth token; locally
