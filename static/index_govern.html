@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ernest Account Intelligence Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+
+  :root{
+    --navy:#0b2545; --navy2:#123a6b; --teal:#0fb5ae; --orange:#f2622e;
+    --bg:#f4f6f9; --card:#ffffff; --border:#e3e8ef; --text:#1c2733; --sub:#5b6b7c;
+    --green:#1a9e6b; --red:#d9463e; --amber:#e0a300;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);}
+  .app{display:flex;min-height:100vh;}
+  .sidebar{width:230px;background:linear-gradient(180deg,var(--navy),var(--navy2));color:#fff;flex-shrink:0;padding:20px 0;}
+  .brand{padding:0 20px 20px;border-bottom:1px solid rgba(255,255,255,.12);margin-bottom:14px;}
+  .brand .name{font-size:19px;font-weight:800;letter-spacing:.3px;}
+  .brand .sub{font-size:11.5px;color:#b9c8dd;margin-top:3px;}
+  .navsec{padding:0 20px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#8fa5c2;margin:16px 0 6px;}
+  .navitem{padding:10px 20px;cursor:pointer;font-size:14.5px;color:#dce6f2;display:flex;align-items:center;gap:10px;border-left:3px solid transparent;transition:.15s;}
+  .navitem:hover{background:rgba(255,255,255,.06);}
+  .navitem.active{background:rgba(255,255,255,.1);border-left-color:var(--orange);color:#fff;font-weight:600;}
+  .navitem .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+  .client-switch{padding:6px 14px 14px;}
+  .client-btn{width:100%;text-align:left;padding:10px 12px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#fff;margin-bottom:8px;cursor:pointer;font-size:13.5px;}
+  .client-btn.active{background:var(--teal);border-color:var(--teal);font-weight:700;color:#04231f;}
+  .main{flex:1;padding:26px 32px 60px;max-width:1400px;}
+  .topbar{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;}
+  .topbar h1{font-size:24px;margin:0 0 4px;}
+  .breadcrumb{font-size:13px;color:var(--sub);}
+  .breadcrumb .crumb{cursor:pointer;color:var(--navy2);text-decoration:underline;}
+  .breadcrumb .sep{margin:0 6px;color:#b7c0cb;}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:22px;}
+  .kpi{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;box-shadow:0 1px 2px rgba(20,30,50,.04);}
+  .kpi .label{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
+  .kpi .value{font-size:24px;font-weight:800;color:var(--navy);}
+  .kpi .delta{font-size:12.5px;margin-top:4px;font-weight:600;}
+  .delta.up{color:var(--green);} .delta.down{color:var(--red);} .delta.flat{color:var(--sub);}
+  .grid2{display:grid;grid-template-columns:1.4fr 1fr;gap:18px;margin-bottom:20px;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;box-shadow:0 1px 2px rgba(20,30,50,.04);}
+  .card h3{margin:0 0 12px;font-size:15.5px;color:var(--navy);}
+  .card h3 .tag{font-size:11px;font-weight:600;color:var(--sub);text-transform:none;margin-left:8px;}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  th{text-align:left;padding:9px 10px;color:var(--sub);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border);}
+  td{padding:9px 10px;border-bottom:1px solid #eef1f5;}
+  tr.clickable{cursor:pointer;}
+  tr.clickable:hover{background:#f7fafc;}
+  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11.5px;font-weight:700;}
+  .pill.good{background:#e4f7ee;color:var(--green);}
+  .pill.warn{background:#fff3dc;color:var(--amber);}
+  .pill.bad{background:#fdeceb;color:var(--red);}
+  .pill.neutral{background:#eef2f7;color:var(--sub);}
+  .stgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-bottom:22px;}
+  .stcard{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:.15s;}
+  .stcard:hover{border-color:var(--teal);box-shadow:0 4px 14px rgba(15,181,174,.13);transform:translateY(-1px);}
+  .stcard .stname{font-weight:700;font-size:14.5px;color:var(--navy);margin-bottom:2px;}
+  .stcard .stloc{font-size:12px;color:var(--sub);margin-bottom:10px;}
+  .stcard .strow{display:flex;justify-content:space-between;font-size:12.5px;padding:3px 0;}
+  .strow b{color:var(--text);}
+  .section-title{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--sub);margin:26px 0 10px;font-weight:700;}
+  .bcgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .bc-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;}
+  .bc-card h4{margin:0 0 10px;font-size:14px;color:var(--navy);display:flex;align-items:center;gap:8px;}
+  .bc-card ul{margin:0;padding-left:18px;}
+  .bc-card li{font-size:13.3px;line-height:1.55;margin-bottom:9px;color:#333e49;}
+  .bc-header{background:linear-gradient(120deg,var(--navy),var(--navy2));color:#fff;border-radius:14px;padding:22px 26px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;}
+  .bc-header .h-name{font-size:22px;font-weight:800;}
+  .bc-header .h-sub{font-size:13px;color:#c7d6ea;margin-top:4px;}
+  .bc-metrics{display:flex;gap:26px;}
+  .bc-metrics .m{text-align:right;}
+  .bc-metrics .m .v{font-size:20px;font-weight:800;}
+  .bc-metrics .m .l{font-size:11px;color:#b9c8dd;text-transform:uppercase;}
+  .badge-icon{width:22px;height:22px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;color:#fff;}
+  .ic-growth{background:var(--green);} .ic-decline{background:var(--red);} .ic-cross{background:var(--teal);}
+  .ic-margin{background:var(--amber);} .ic-risk{background:var(--navy2);} .ic-play{background:var(--orange);}
+  .tabs{display:flex;gap:6px;margin-bottom:16px;}
+  .tabbtn{padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:#fff;font-size:13px;cursor:pointer;color:var(--sub);font-weight:600;}
+  .tabbtn.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+  .small-muted{font-size:12px;color:var(--sub);}
+  .chart-wrap{position:relative;height:260px;}
+  .chart-wrap.short{height:200px;}
+  .footer-note{margin-top:30px;font-size:11.5px;color:#93a1af;border-top:1px solid var(--border);padding-top:14px;}
+  ::-webkit-scrollbar{width:8px;height:8px;} ::-webkit-scrollbar-thumb{background:#c7d1db;border-radius:6px;}
+  .search-materials{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;margin-bottom:10px;}
+</style>
+<style>
+  /* ---- added: loading + genie ---- */
+  .loading-overlay{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:50;}
+  .spinner{width:44px;height:44px;border:4px solid #d7e0ea;border-top-color:var(--teal);border-radius:50%;animation:spin 1s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .loading-overlay .msg{margin-top:16px;font-size:14px;color:var(--sub);}
+  .load-err{max-width:520px;background:#fff;border:1px solid var(--border);border-left:4px solid var(--red);border-radius:8px;padding:16px 18px;color:var(--text);font-size:13.5px;}
+  .load-err b{color:var(--red);}
+  .genie-wrap{max-width:900px;}
+  .genie-hero{background:linear-gradient(120deg,var(--navy),var(--navy2));color:#fff;border-radius:14px;padding:22px 26px;margin-bottom:18px;}
+  .genie-hero h2{margin:0 0 4px;font-size:20px;}
+  .genie-hero p{margin:0;font-size:13px;color:#c7d6ea;}
+  .genie-box{display:flex;gap:10px;margin-bottom:14px;}
+  .genie-input{flex:1;padding:12px 14px;border:1px solid var(--border);border-radius:10px;font-size:14px;}
+  .genie-input:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px rgba(15,181,174,.15);}
+  .genie-btn{padding:12px 20px;border:none;border-radius:10px;background:var(--teal);color:#04231f;font-weight:700;font-size:14px;cursor:pointer;}
+  .genie-btn:disabled{opacity:.55;cursor:not-allowed;}
+  .genie-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;}
+  .genie-chip{padding:7px 12px;border:1px solid var(--border);background:#fff;border-radius:20px;font-size:12.5px;color:var(--navy2);cursor:pointer;}
+  .genie-chip:hover{border-color:var(--teal);background:#f0fbfa;}
+  .genie-answer{background:#fff;border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:16px;}
+  .genie-answer .qtext{font-weight:700;color:var(--navy);margin-bottom:10px;font-size:14.5px;}
+  .genie-answer .atext{font-size:14px;line-height:1.6;color:#333e49;white-space:pre-wrap;margin-bottom:12px;}
+  .genie-sql{background:#0b2545;color:#d7e6f7;border-radius:8px;padding:12px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;overflow-x:auto;white-space:pre;margin-bottom:12px;}
+  .genie-thinking{display:flex;align-items:center;gap:10px;color:var(--sub);font-size:13.5px;}
+  .genie-thinking .spinner{width:20px;height:20px;border-width:3px;}
+  /* ---- added: docked right Genie panel ---- */
+  #main{flex:1;min-width:0;}
+  .genie-panel{width:360px;flex:0 0 360px;background:var(--card);border-left:1px solid var(--border);
+    display:flex;flex-direction:column;height:100vh;position:sticky;top:0;overflow:hidden;}
+  .genie-panel-head{padding:18px 20px 14px;background:linear-gradient(120deg,var(--navy),var(--navy2));color:#fff;}
+  .genie-panel-head .gp-title{font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px;}
+  .genie-panel-head .gp-badge{font-size:10px;font-weight:700;letter-spacing:.5px;background:var(--teal);color:#04231f;
+    padding:2px 7px;border-radius:20px;}
+  .genie-panel-head .gp-sub{font-size:12px;color:#c7d6ea;margin-top:4px;}
+  .genie-panel-body{flex:1;overflow-y:auto;padding:16px;}
+  .genie-panel .genie-box{margin-bottom:12px;}
+  .genie-panel .genie-answer{padding:14px 15px;}
+  .genie-panel .genie-sql{font-size:11.5px;}
+  @media(max-width:1100px){ .genie-panel{width:300px;flex-basis:300px;} }
+</style>
+</head>
+
+<body>
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="msg" id="loadingMsg">Connecting to Databricks &middot; workspace.sss &hellip;</div>
+</div>
+<div class="app" id="appRoot" style="display:none;">
+  <div class="sidebar">
+    <div class="brand">
+      <div class="name">ERNEST</div>
+      <div class="sub">Account Intelligence &middot; Strategic Selling</div>
+    </div>
+    <div class="client-switch" id="clientSwitch"></div>
+    <div class="navsec">Analyze</div>
+    <div id="navItems"></div>
+  </div>
+  <div class="main" id="main"></div>
+  <aside class="genie-panel" id="geniePanel">
+    <div class="genie-panel-head">
+      <div class="gp-title">DATA ZEN <span class="gp-badge">AI/BI</span></div>
+      <div class="gp-sub">Natural language &rarr; Your Data</div>
+    </div>
+    <div class="genie-panel-body">
+      <div class="genie-box">
+        <input class="genie-input" id="genieInput" placeholder="Ask about your data&hellip;"
+               onkeydown="if(event.key==='Enter')askGenie()">
+        <button class="genie-btn" id="genieBtn" onclick="askGenie()">Ask</button>
+      </div>
+      <div class="genie-chips" id="genieChips"></div>
+      <div id="genieResults"></div>
+    </div>
+  </aside>
+</div>
+<script>
+
+let DATA = null;
+let CLIENTS = [];
+
+let state = { client: CLIENTS[0], view: 'portfolio', shipTo: null };
+let charts = {};
+
+function fmtMoney(x, digits){ digits = digits===undefined?0:digits; return '$' + Number(x).toLocaleString(undefined,{minimumFractionDigits:digits,maximumFractionDigits:digits}); }
+function fmtPct(x){ return Number(x).toFixed(1) + '%'; }
+function destroyChart(id){ if(charts[id]){ charts[id].destroy(); delete charts[id]; } }
+function monthLabel(my){ const [m,y]=my.split('-'); return m+"/"+y.slice(2); }
+
+function setState(patch){ state = Object.assign({}, state, patch); render(); }
+
+function renderSidebar(){
+  const cs = document.getElementById('clientSwitch');
+  cs.innerHTML = CLIENTS.map(c => {
+    const active = c===state.client ? 'active' : '';
+    return `<button class="client-btn ${active}" onclick="setState({client:'${c}', shipTo:null})">${c}</button>`;
+  }).join('');
+
+  const items = [
+    ['portfolio','Portfolio Analysis'],
+    ['overview','Overview'],
+    ['shiptos','Ship-To Drilldown'],
+    ['trends','Growth & Cross-Sell'],
+    ['risk','Risk Radar'],
+    ['battlecard','Battle Card'],
+  ];
+  const nav = document.getElementById('navItems');
+  nav.innerHTML = items.map(([key,label]) => {
+    const active = key===state.view ? 'active':'';
+    return `<div class="navitem ${active}" onclick="setState({view:'${key}', shipTo:null})"><span class="dot"></span>${label}</div>`;
+  }).join('');
+}
+
+function breadcrumb(){
+  let parts = [`<span class="crumb" onclick="setState({shipTo:null})">${state.client}</span>`];
+  if(state.shipTo){ parts.push(`<span class="sep">/</span><span>${state.shipTo}</span>`); }
+  return `<div class="breadcrumb">${parts.join('')}</div>`;
+}
+
+function pillForGtm(pct){
+  if(pct >= 28) return `<span class="pill good">${fmtPct(pct)}</span>`;
+  if(pct >= 15) return `<span class="pill warn">${fmtPct(pct)}</span>`;
+  return `<span class="pill bad">${fmtPct(pct)}</span>`;
+}
+
+function pillForGrowth(pct){
+  if(pct===999) return `<span class="pill good">New</span>`;
+  if(pct > 5) return `<span class="pill good">+${pct.toFixed(0)}%</span>`;
+  if(pct < -5) return `<span class="pill bad">${pct.toFixed(0)}%</span>`;
+  return `<span class="pill neutral">${pct.toFixed(0)}%</span>`;
+}
+
+// ---------------- OVERVIEW ----------------
+function renderPortfolio(){
+  const months = DATA.months;
+  const clientKeys = Object.keys(DATA.clients);
+
+  // ---- portfolio-wide totals ----
+  let totRev=0, totGtm=0, totCost=0, shipToSet=new Set();
+  clientKeys.forEach(k=>{
+    const c = DATA.clients[k];
+    totRev += c.total_revenue||0;
+    totGtm += c.total_gtm||0;
+    totCost += c.total_cost||0;
+    (c.ship_tos||[]).forEach(s=>shipToSet.add(k+'|'+s));
+  });
+  const blendedGtmPct = totRev ? (totGtm/totRev*100) : 0;
+
+  // ---- monthly revenue + GTM% summed across all clients ----
+  const rev = months.map(m => clientKeys.reduce((a,k)=>{
+    const row=(DATA.clients[k].monthly||[]).find(x=>x.month===m); return a+(row?row.revenue:0); },0));
+  const gtm = months.map(m => clientKeys.reduce((a,k)=>{
+    const row=(DATA.clients[k].monthly||[]).find(x=>x.month===m); return a+(row?row.gtm:0); },0));
+  const gtmPct = months.map((m,i)=> rev[i] ? (gtm[i]/rev[i]*100) : 0);
+
+  // ---- revenue by client (for the ranked table + doughnut) ----
+  const byClient = clientKeys.map(k=>({
+    client:k,
+    revenue: DATA.clients[k].total_revenue||0,
+    gtm: DATA.clients[k].total_gtm||0,
+    gtm_pct: DATA.clients[k].avg_gtm_pct||0,
+    ship_tos: (DATA.clients[k].ship_tos||[]).length,
+  })).sort((a,b)=>b.revenue-a.revenue);
+
+  document.getElementById('main').innerHTML = `
+    <div class="topbar"><div><h1>Portfolio Analysis</h1><div class="breadcrumb">All clients &middot; ${clientKeys.length} accounts</div></div></div>
+    <div class="kpis">
+      <div class="kpi"><div class="label">Overall Revenue</div><div class="value">${fmtMoney(totRev)}</div><div class="small-muted">${months.length} months, all clients</div></div>
+      <div class="kpi"><div class="label">Overall GTM $</div><div class="value">${fmtMoney(totGtm)}</div><div class="small-muted">${fmtPct(blendedGtmPct)} blended margin</div></div>
+      <div class="kpi"><div class="label">Total Clients</div><div class="value">${clientKeys.length}</div><div class="small-muted">Active accounts</div></div>
+      <div class="kpi"><div class="label">Total Ship-To's</div><div class="value">${shipToSet.size}</div><div class="small-muted">Across all accounts</div></div>
+    </div>
+    <div class="grid2">
+      <div class="card"><h3>Monthly Revenue Trend <span class="tag">all clients</span></h3><div class="chart-wrap"><canvas id="pfTrend"></canvas></div></div>
+      <div class="card"><h3>Revenue by Client <span class="tag">share of portfolio</span></h3><div class="chart-wrap"><canvas id="pfClientChart"></canvas></div></div>
+    </div>
+    <div class="card">
+      <h3>Clients Ranked <span class="tag">click to open account</span></h3>
+      <table>
+        <thead><tr><th>Client</th><th>Revenue</th><th>GTM $</th><th>GTM %</th><th>Ship-To's</th></tr></thead>
+        <tbody>
+          ${byClient.map(c=>`<tr class="clickable" onclick="setState({client:'${c.client.replace(/'/g,"\\'")}', view:'overview', shipTo:null})">
+            <td><b>${c.client}</b></td><td>${fmtMoney(c.revenue)}</td><td>${fmtMoney(c.gtm)}</td><td>${pillForGtm(c.gtm_pct)}</td><td>${c.ship_tos}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div class="footer-note">Portfolio totals aggregated across all ${clientKeys.length} accounts for the extract period. AI-generated. Validate with a qualified professional before using in customer-facing decisions.</div>
+  `;
+
+  destroyChart('pfTrend');
+  charts.pfTrend = new Chart(document.getElementById('pfTrend'), {
+    type:'bar',
+    data:{ labels: months.map(monthLabel), datasets:[
+      {type:'bar', label:'Revenue', data:rev, backgroundColor:'#0fb5ae', order:2, yAxisID:'y'},
+      {type:'line', label:'GTM %', data:gtmPct, borderColor:'#f2622e', backgroundColor:'#f2622e', tension:.3, yAxisID:'y1', order:1, pointRadius:3}
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      scales:{ y:{beginAtZero:true, title:{display:true,text:'Revenue ($)'}}, y1:{beginAtZero:true, position:'right', grid:{drawOnChartArea:false}, title:{display:true,text:'GTM %'}} },
+      plugins:{legend:{position:'bottom'}}
+    }
+  });
+
+  destroyChart('pfClientChart');
+  charts.pfClientChart = new Chart(document.getElementById('pfClientChart'), {
+    type:'doughnut',
+    data:{ labels: byClient.map(c=>c.client), datasets:[{ data: byClient.map(c=>c.revenue), backgroundColor:['#0b2545','#0fb5ae','#f2622e','#e0a300','#7a8fa8','#1a9e6b','#b5651d','#4a6fa5'] }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{boxWidth:12,font:{size:11}}}} }
+  });
+}
+
+function renderOverview(cd, ins){
+  const months = DATA.months;
+  const rev = months.map(m => (cd.monthly.find(x=>x.month===m)||{revenue:0}).revenue);
+  const gtm = months.map(m => (cd.monthly.find(x=>x.month===m)||{gtm:0}).gtm);
+  const gtmPct = months.map((m,i)=> rev[i] ? (gtm[i]/rev[i]*100) : 0);
+
+  const otMix = cd.order_type_mix;
+  const otLabels = Object.keys(otMix); const otVals = Object.values(otMix);
+
+  const topShipTos = Object.values(cd.shipto_data).sort((a,b)=>b.revenue-a.revenue).slice(0,5);
+
+  document.getElementById('main').innerHTML = `
+    <div class="topbar"><div><h1>${state.client} &mdash; Account Overview</h1>${breadcrumb()}</div></div>
+    <div class="kpis">
+      <div class="kpi"><div class="label">Trailing Revenue</div><div class="value">${fmtMoney(cd.total_revenue)}</div><div class="small-muted">${DATA.months.length} months of activity</div></div>
+      <div class="kpi"><div class="label">GTM $ (Margin)</div><div class="value">${fmtMoney(cd.total_gtm)}</div><div class="small-muted">Gross-to-margin dollars</div></div>
+      <div class="kpi"><div class="label">Blended GTM %</div><div class="value">${fmtPct(cd.avg_gtm_pct)}</div><div class="small-muted">Revenue-weighted margin</div></div>
+      <div class="kpi"><div class="label">Active Ship-To's</div><div class="value">${cd.ship_tos.length}</div><div class="small-muted">${Object.keys(otMix).join(', ')}</div></div>
+    </div>
+    <div class="grid2">
+      <div class="card"><h3>Revenue &amp; Margin Trend <span class="tag">monthly</span></h3><div class="chart-wrap"><canvas id="trendChart"></canvas></div></div>
+      <div class="card"><h3>Order Type Mix <span class="tag">by revenue</span></h3><div class="chart-wrap"><canvas id="otChart"></canvas></div></div>
+    </div>
+    <div class="card">
+      <h3>Top Ship-To Locations <span class="tag">click to drill in</span></h3>
+      <table>
+        <thead><tr><th>Ship-To</th><th>City / State</th><th>Revenue</th><th>GTM %</th><th>Orders</th></tr></thead>
+        <tbody>
+          ${topShipTos.map(s=>`<tr class="clickable" onclick="setState({view:'shiptos', shipTo:'${s.ship_to.replace(/'/g,"\\'")}'})">
+            <td><b>${s.ship_to}</b></td><td>${s.city}, ${s.state}</td><td>${fmtMoney(s.revenue)}</td><td>${pillForGtm(s.gtm_pct)}</td><td>${s.orders}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div class="footer-note">Data reflects the extract period Jul 2025 &ndash; Jul 2026. AI-generated. Validate with a qualified professional before using in customer-facing decisions.</div>
+  `;
+
+  destroyChart('trendChart');
+  charts.trendChart = new Chart(document.getElementById('trendChart'), {
+    type:'bar',
+    data:{ labels: months.map(monthLabel), datasets:[
+      {type:'bar', label:'Revenue', data:rev, backgroundColor:'#0fb5ae', order:2, yAxisID:'y'},
+      {type:'line', label:'GTM %', data:gtmPct, borderColor:'#f2622e', backgroundColor:'#f2622e', tension:.3, yAxisID:'y1', order:1, pointRadius:3}
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      scales:{ y:{beginAtZero:true, title:{display:true,text:'Revenue ($)'}}, y1:{beginAtZero:true, position:'right', grid:{drawOnChartArea:false}, title:{display:true,text:'GTM %'}} },
+      plugins:{legend:{position:'bottom'}}
+    }
+  });
+
+  destroyChart('otChart');
+  charts.otChart = new Chart(document.getElementById('otChart'), {
+    type:'doughnut',
+    data:{ labels: otLabels, datasets:[{ data: otVals, backgroundColor:['#0b2545','#0fb5ae','#f2622e','#e0a300','#7a8fa8','#1a9e6b'] }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{boxWidth:12,font:{size:11}}}} }
+  });
+}
+
+// ---------------- SHIP-TO DRILLDOWN ----------------
+function renderShipTos(cd, ins){
+  if(!state.shipTo){
+    const list = Object.values(cd.shipto_data).sort((a,b)=>b.revenue-a.revenue);
+    document.getElementById('main').innerHTML = `
+      <div class="topbar"><div><h1>${state.client} &mdash; Ship-To Locations</h1>${breadcrumb()}</div></div>
+      <div class="stgrid">
+        ${list.map(s=>`
+          <div class="stcard" onclick="setState({shipTo:'${s.ship_to.replace(/'/g,"\\'")}'})">
+            <div class="stname">${s.ship_to}</div>
+            <div class="stloc">${s.city}, ${s.state} &middot; ${s.plant}</div>
+            <div class="strow"><span>Revenue</span><b>${fmtMoney(s.revenue)}</b></div>
+            <div class="strow"><span>GTM %</span><b>${fmtPct(s.gtm_pct)}</b></div>
+            <div class="strow"><span>Orders</span><b>${s.orders}</b></div>
+            <div class="strow"><span>Product lines</span><b>${s.hierarchies.length}</b></div>
+          </div>`).join('')}
+      </div>
+      <div class="footer-note">Click any location to drill into its product mix, materials, and cost detail. AI-generated. Validate with a qualified professional.</div>
+    `;
+    return;
+  }
+
+  const st = cd.shipto_data[state.shipTo];
+  const months = DATA.months;
+  const rev = months.map(m => (st.monthly.find(x=>x.month===m)||{revenue:0}).revenue);
+  const gtmPct = months.map((m,i)=>{ const row = st.monthly.find(x=>x.month===m); return row && row.revenue ? row.gtm/row.revenue*100 : 0; });
+
+  document.getElementById('main').innerHTML = `
+    <div class="topbar"><div><h1>${st.ship_to}</h1>${breadcrumb()}</div></div>
+    <div class="kpis">
+      <div class="kpi"><div class="label">Revenue</div><div class="value">${fmtMoney(st.revenue)}</div><div class="small-muted">${st.city}, ${st.state}</div></div>
+      <div class="kpi"><div class="label">GTM %</div><div class="value">${fmtPct(st.gtm_pct)}</div></div>
+      <div class="kpi"><div class="label">Orders</div><div class="value">${st.orders}</div></div>
+      <div class="kpi"><div class="label">Product Lines</div><div class="value">${st.hierarchies.length}</div></div>
+    </div>
+    <div class="grid2">
+      <div class="card"><h3>Revenue &amp; Margin Trend</h3><div class="chart-wrap"><canvas id="stTrend"></canvas></div></div>
+      <div class="card">
+        <h3>Product Hierarchy Mix</h3>
+        <table><thead><tr><th>Category</th><th>Revenue</th><th>GTM %</th></tr></thead>
+        <tbody>${st.hierarchies.slice(0,8).map(h=>`<tr><td>${h.hier}</td><td>${fmtMoney(h.revenue)}</td><td>${pillForGtm(h.gtm_pct)}</td></tr>`).join('')}</tbody></table>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Materials Sold at this Location <span class="tag">${st.materials.length} SKUs</span></h3>
+      <input class="search-materials" placeholder="Filter materials..." oninput="filterMaterials(this.value)">
+      <table id="matTable">
+        <thead><tr><th>Material</th><th>Category</th><th>Revenue</th><th>GTM %</th><th>Vendor</th><th>Cost Variance</th></tr></thead>
+        <tbody id="matTbody">
+          ${st.materials.map(m=>`<tr data-search="${(m.material+' '+m.hier).toLowerCase()}">
+            <td>${m.material}</td><td>${m.hier}</td><td>${fmtMoney(m.revenue)}</td><td>${pillForGtm(m.gtm_pct)}</td>
+            <td>${m.vendor_name||'&mdash;'}</td>
+            <td>${Math.abs(m.std_cost_variance_pct)>5?`<span class="pill bad">${fmtPct(m.std_cost_variance_pct)}</span>`:(Math.abs(m.po_variance_pct)>5?`<span class="pill warn">PO ${fmtPct(m.po_variance_pct)}</span>`:'&mdash;')}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div class="footer-note">AI-generated. Validate with a qualified professional before customer-facing use.</div>
+  `;
+
+  destroyChart('stTrend');
+  charts.stTrend = new Chart(document.getElementById('stTrend'), {
+    type:'bar',
+    data:{ labels: months.map(monthLabel), datasets:[
+      {type:'bar', label:'Revenue', data:rev, backgroundColor:'#0fb5ae', yAxisID:'y'},
+      {type:'line', label:'GTM %', data:gtmPct, borderColor:'#f2622e', tension:.3, yAxisID:'y1', pointRadius:3}
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      scales:{ y:{beginAtZero:true}, y1:{beginAtZero:true, position:'right', grid:{drawOnChartArea:false}} },
+      plugins:{legend:{position:'bottom'}}
+    }
+  });
+}
+
+function filterMaterials(q){
+  q = q.toLowerCase();
+  document.querySelectorAll('#matTbody tr').forEach(tr=>{
+    tr.style.display = tr.dataset.search.includes(q) ? '' : 'none';
+  });
+}
+
+// ---------------- GROWTH & CROSS-SELL ----------------
+function renderTrends(cd, ins){
+  document.getElementById('main').innerHTML = `
+    <div class="topbar"><div><h1>${state.client} &mdash; Growth &amp; Cross-Sell Opportunities</h1>${breadcrumb()}</div></div>
+    <div class="grid2">
+      <div class="card">
+        <h3><span class="badge-icon ic-growth">&uarr;</span> Growing Product Lines <span class="tag">last 3 mo vs prior 3 mo</span></h3>
+        <table><thead><tr><th>Category</th><th>Change</th><th>Current Qtr Rev</th></tr></thead>
+        <tbody>${ins.growth.growers.map(g=>`<tr><td>${g.hier}</td><td>${pillForGrowth(g.pct_change)}</td><td>${fmtMoney(g.last3_revenue)}</td></tr>`).join('') || '<tr><td colspan="3" class="small-muted">No strong growth lines detected.</td></tr>'}</tbody></table>
+      </div>
+      <div class="card">
+        <h3><span class="badge-icon ic-decline">&darr;</span> Declining Product Lines</h3>
+        <table><thead><tr><th>Category</th><th>Change</th><th>Current Qtr Rev</th></tr></thead>
+        <tbody>${ins.growth.decliners.map(g=>`<tr><td>${g.hier}</td><td>${pillForGrowth(g.pct_change)}</td><td>${fmtMoney(g.last3_revenue)}</td></tr>`).join('') || '<tr><td colspan="3" class="small-muted">No material declines detected.</td></tr>'}</tbody></table>
+      </div>
+    </div>
+    <div class="card">
+      <h3><span class="badge-icon ic-cross">&#8644;</span> Cross-Sell Whitespace <span class="tag">categories peer ship-to's buy that this one doesn't</span></h3>
+      <table><thead><tr><th>Ship-To</th><th>Category Opportunity</th><th>Peer Locations Buying It</th><th>Avg Peer Revenue</th></tr></thead>
+      <tbody>${ins.whitespace.map(w=>`<tr class="clickable" onclick="setState({view:'shiptos', shipTo:'${w.ship_to.replace(/'/g,"\\'")}'})"><td><b>${w.ship_to}</b></td><td>${w.hier}</td><td>${w.peer_count}</td><td>${fmtMoney(w.avg_peer_revenue)}</td></tr>`).join('') || '<tr><td colspan="4" class="small-muted">No whitespace gaps detected.</td></tr>'}</tbody></table>
+    </div>
+    <div class="footer-note">Growth calculated from ${ins.prior3_months.map(monthLabel).join('/')} vs ${ins.last3_months.map(monthLabel).join('/')}. AI-generated. Validate with a qualified professional.</div>
+  `;
+}
+
+// ---------------- RISK RADAR ----------------
+function renderRisk(cd, ins){
+  document.getElementById('main').innerHTML = `
+    <div class="topbar"><div><h1>${state.client} &mdash; Risk Radar</h1>${breadcrumb()}</div></div>
+    <div class="grid2">
+      <div class="card">
+        <h3><span class="badge-icon ic-margin">%</span> Margin Watchlist <span class="tag">lines below target GTM%</span></h3>
+        <table><thead><tr><th>Ship-To</th><th>Category</th><th>GTM %</th><th>Revenue</th></tr></thead>
+        <tbody>${ins.margin_flags.map(m=>`<tr><td>${m.ship_to}</td><td>${m.hier}</td><td>${pillForGtm(m.gtm_pct)}</td><td>${fmtMoney(m.revenue)}</td></tr>`).join('') || '<tr><td colspan="4" class="small-muted">No margin flags &mdash; healthy account.</td></tr>'}</tbody></table>
+      </div>
+      <div class="card">
+        <h3><span class="badge-icon ic-risk">!</span> Cost / PO Variance Flags</h3>
+        <table><thead><tr><th>Material</th><th>Ship-To</th><th>PO Var %</th><th>Std Cost Var %</th></tr></thead>
+        <tbody>${ins.cost_risk.map(c=>`<tr><td>${c.material}</td><td>${c.ship_to}</td><td>${fmtPct(c.po_variance_pct)}</td><td>${fmtPct(c.std_cost_variance_pct)}</td></tr>`).join('') || '<tr><td colspan="4" class="small-muted">No cost variance flags.</td></tr>'}</tbody></table>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Supplier Concentration <span class="tag">SKU count by vendor for this account</span></h3>
+      <div class="chart-wrap short"><canvas id="supChart"></canvas></div>
+    </div>
+    <div class="section-title">Order Type Mix by Ship-To</div>
+    <table><thead><tr><th>Ship-To</th><th>Dominant Order Type</th><th>% of Revenue</th><th>JIT %</th><th>Stock %</th></tr></thead>
+    <tbody>${ins.order_risk.map(o=>`<tr><td>${o.ship_to}</td><td>${o.dominant_type||'&mdash;'}</td><td>${fmtPct(o.dominant_pct)}</td><td>${fmtPct(o.jit_pct)}</td><td>${fmtPct(o.stock_pct)}</td></tr>`).join('')}</tbody></table>
+    <div class="footer-note">AI-generated. Validate with a qualified professional before renegotiating vendor terms.</div>
+  `;
+
+  destroyChart('supChart');
+  const sup = ins.top_suppliers;
+  charts.supChart = new Chart(document.getElementById('supChart'), {
+    type:'bar',
+    data:{ labels: sup.map(s=>s[0]), datasets:[{label:'SKUs', data: sup.map(s=>s[1]), backgroundColor:'#123a6b'}] },
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}} }
+  });
+}
+
+// ---------------- BATTLE CARD ----------------
+function renderBattleCard(cd, ins, bc){
+  document.getElementById('main').innerHTML = `
+    <div class="bc-header">
+      <div>
+        <div class="h-name">${state.client} &mdash; Strategic Battle Card</div>
+        <div class="h-sub">Prepared for Ernest sales team &middot; ${DATA.months.length}-month view</div>
+      </div>
+      <div class="bc-metrics">
+        <div class="m"><div class="v">${fmtMoney(cd.total_revenue)}</div><div class="l">Revenue</div></div>
+        <div class="m"><div class="v">${fmtPct(cd.avg_gtm_pct)}</div><div class="l">GTM Margin</div></div>
+        <div class="m"><div class="v">${cd.ship_tos.length}</div><div class="l">Ship-To's</div></div>
+      </div>
+    </div>
+    <div class="bcgrid">
+      <div class="bc-card"><h4><span class="badge-icon ic-cross">i</span> Account Snapshot</h4><ul>${bc.snapshot.map(s=>`<li>${s}</li>`).join('')}</ul></div>
+      <div class="bc-card"><h4><span class="badge-icon ic-growth">&uarr;</span> Growth to Reinforce</h4><ul>${bc.growth_bullets.map(s=>`<li>${s}</li>`).join('')}</ul></div>
+      <div class="bc-card"><h4><span class="badge-icon ic-cross">&#8644;</span> Cross-Sell Whitespace</h4><ul>${bc.whitespace_bullets.map(s=>`<li>${s}</li>`).join('')}</ul></div>
+      <div class="bc-card"><h4><span class="badge-icon ic-margin">%</span> Margin Watch</h4><ul>${bc.margin_bullets.map(s=>`<li>${s}</li>`).join('')}</ul></div>
+      <div class="bc-card"><h4><span class="badge-icon ic-risk">!</span> Risks &amp; Renegotiation Points</h4><ul>${bc.risk_bullets.map(s=>`<li>${s}</li>`).join('')}</ul></div>
+      <div class="bc-card"><h4><span class="badge-icon ic-play">&#9654;</span> Recommended Plays / Talk Track</h4><ul>${bc.plays.map(s=>`<li>${s}</li>`).join('')}</ul></div>
+    </div>
+    <div class="footer-note">⚠️ DRAFT — FOR HUMAN REVIEW ONLY. Not reviewed by Fulcrum Legal, IT security, compliance, or clinical professionals. Do not share externally or with client. If in doubt please reach out to CISO@fulcrumdigital.com<br>AI-generated. Validate with a qualified professional.</div>
+  `;
+}
+
+function render(){
+  renderSidebar();
+  if(state.view==='portfolio'){ renderPortfolio(); return; }
+  const cd = DATA.clients[state.client];
+  const ins = DATA.insights[state.client];
+  const bc = DATA.battlecards[state.client];
+  if(state.view==='overview') renderOverview(cd, ins);
+  else if(state.view==='shiptos') renderShipTos(cd, ins);
+  else if(state.view==='trends') renderTrends(cd, ins);
+  else if(state.view==='risk') renderRisk(cd, ins);
+  else if(state.view==='battlecard') renderBattleCard(cd, ins, bc);
+}
+
+
+// ---------------- GENIE (AI/BI natural language) ----------------
+let GENIE_HISTORY = [];
+
+function initGeniePanel(){
+  const suggestions = [
+    "Top 10 ship-to locations by revenue",
+    "Which product hierarchies have the lowest GTM %?",
+    "Show materials with PO variance over 20%",
+    "Total revenue by state for this quarter",
+    "Which vendors supply the most SKUs?"
+  ];
+  const chips = document.getElementById('genieChips');
+  if(chips){
+    chips.innerHTML = suggestions.map(s=>
+      `<span class="genie-chip" onclick="document.getElementById('genieInput').value='${s.replace(/'/g,"\\'")}';askGenie()">${s}</span>`
+    ).join('');
+  }
+  const res = document.getElementById('genieResults');
+  if(res){ res.innerHTML = GENIE_HISTORY.map(renderGenieCard).join(''); }
+}
+
+function renderGenieCard(item){
+  if(item.pending){
+    return `<div class="genie-answer"><div class="qtext">${escapeHtml(item.question)}</div>
+      <div class="genie-thinking"><div class="spinner"></div> Genie is thinking&hellip;</div></div>`;
+  }
+  if(item.error){
+    return `<div class="genie-answer"><div class="qtext">${escapeHtml(item.question)}</div>
+      <div class="load-err"><b>Genie error:</b> ${escapeHtml(item.error)}</div></div>`;
+  }
+  let rowsHtml = '';
+  if(item.rows && item.rows.length){
+    const cols = item.columns && item.columns.length ? item.columns : Object.keys(item.rows[0]);
+    rowsHtml = `<table><thead><tr>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>
+      <tbody>${item.rows.slice(0,25).map(r=>`<tr>${cols.map(c=>`<td>${escapeHtml(String(r[c]??''))}</td>`).join('')}</tr>`).join('')}</tbody></table>
+      ${item.rows.length>25?`<div class="small-muted" style="margin-top:8px;">Showing 25 of ${item.rows.length} rows.</div>`:''}`;
+  }
+  return `<div class="genie-answer">
+    <div class="qtext">${escapeHtml(item.question)}</div>
+    <!-- ${item.text?`<div class="atext">${escapeHtml(item.text)}</div>`:''}  -->
+    <!-- ${item.sql?`<div class="genie-sql">${escapeHtml(item.sql)}</div>`:''} -->
+    ${rowsHtml}
+  </div>`;
+}
+
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function askGenie(){
+  const input = document.getElementById('genieInput');
+  const q = (input.value||'').trim();
+  if(!q) return;
+  input.value = '';
+  const item = { question:q, pending:true };
+  GENIE_HISTORY.unshift(item);
+  document.getElementById('genieResults').innerHTML = GENIE_HISTORY.map(renderGenieCard).join('');
+  try{
+    const res = await fetch('/api/genie/ask', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({question:q})
+    });
+    const data = await res.json();
+    Object.assign(item, {pending:false}, data);
+    if(data.error) item.error = data.error;
+  }catch(e){
+    item.pending = false; item.error = e.message;
+  }
+  document.getElementById('genieResults').innerHTML = GENIE_HISTORY.map(renderGenieCard).join('');
+}
+
+// ---------------- BOOTSTRAP: fetch live data then render ----------------
+async function boot(){
+  try{
+    const res = await fetch('/api/data');
+    if(!res.ok){ const j = await res.json().catch(()=>({})); throw new Error(j.error || ('HTTP '+res.status)); }
+    DATA = await res.json();
+    CLIENTS = Object.keys(DATA.clients || {});
+    if(!CLIENTS.length) throw new Error('No client data returned from workspace.sss.');
+    state.client = CLIENTS[0];
+    document.getElementById('loadingOverlay').style.display = 'none';
+    document.getElementById('appRoot').style.display = 'flex';
+    render();
+    initGeniePanel();
+  }catch(e){
+    document.getElementById('loadingOverlay').innerHTML =
+      '<div class="load-err"><b>Could not load data.</b><br>'+escapeHtml(e.message)+
+      '<br><br>Check the SQL warehouse ID, token, and that workspace.sss.sales / inventory exist and are readable.</div>';
+  }
+}
+boot();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+command:
+  - "gunicorn"
+  - "app:app"
+  - "--bind"
+  - "0.0.0.0:8000"
+  - "--timeout"
+  - "120"
+
+env:
+   DATABRICKS_WORKSPACE_ID: "7405610968279077"          # dummy workspace ID
+   GENIE_SPACE_ID: "8f7b505b0b1b4ed69a0d00061abb907c"   # dummy Genie space ID
+   DATABRICKS_WAREHOUSE_ID: "9dd4e8b307c8fc35"         # bind a SQL warehouse resource named 'sql_warehouse'
+   DBX_CATALOG: "ernest_dashbord_poc"
+   DBX_SCHEMA: "invetory_sales_schema"
+   DBX_SALES_TABLE: "sales_data_updated"
+   DBX_INVENTORY_TABLE : "inventory_data_curated"
+   DATABRICKS_HOST: "https://adb-7405607280061101.1.azuredatabricks.net"
+   DATABRICKS_TOKEN: "dapi292b54792c2b1cdfbe5096af695d0421-3"
+   DATABRICKS_WAREHOUSE_ID: "f10214f943eb8d3a"
+   GENIE_SPACE_ID: "01f19fd047b01ddaa13e58c7d48db5a5"
+   DBX_INSIGHTS_TABLE: "ernest_insights"
