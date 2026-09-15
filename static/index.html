@@ -220,7 +220,7 @@ function renderSidebar(){
     ['trends','Growth & Cross-Sell'],
     ['risk','Risk Radar'],
     ['battlecard','Battle Card'],
-    ['forecast','Forecast (TabPFN)'],
+    ['forecast','Forecast'],
     
   ];
   const nav = document.getElementById('navItems');
@@ -290,7 +290,7 @@ function renderForecast(){
   const horizons = [1,2,3,6,9,12];
 
   document.getElementById('main').innerHTML = `
-    <div class="topbar"><div><h1>Forecast <span class="tag">TabPFN prediction</span></h1><div class="breadcrumb">Project a metric forward with an uncertainty band</div></div></div>
+    <div class="topbar"><div><h1>Forecast <span class="tag">/ prediction</span></h1><div class="breadcrumb">Project a metric forward with an uncertainty band</div></div></div>
     <div class="card">
       <div class="fc-controls">
         <div class="fc-field"><label>Metric</label>
