@@ -607,16 +607,16 @@ HITL_CONF = int(os.environ.get("HITL_CONF", "65"))  # confidence below this -> H
 # Whether we have enough config to talk to a live warehouse. The uploaded
 # CONFIG ships dummy values, so we only treat it as live when the token and
 # warehouse id have been overridden away from their dummy defaults.
-# LIVE = not (
-#     CONFIG["DATABRICKS_TOKEN"].startswith("dapiXXXX")
-#     or CONFIG["WAREHOUSE_ID"] == "0123456789abcdef"
-#     or CONFIG["DATABRICKS_HOST"].startswith("https://REPLACE-WORKSPACE")
-# )
 LIVE = not (
-    get_env("DATABRICKS_TOKEN").startswith("dapiXXXX")
-    or get_env("WAREHOUSE_ID") == "0123456789abcdef"
-    or get_env("DATABRICKS_HOST").startswith("https://REPLACE-WORKSPACE")
+    CONFIG["DATABRICKS_TOKEN"].startswith("dapiXXXX")
+    or CONFIG["WAREHOUSE_ID"] == "0123456789abcdef"
+    or CONFIG["DATABRICKS_HOST"].startswith("https://REPLACE-WORKSPACE")
 )
+# LIVE = not (
+#     get_env("DATABRICKS_TOKEN").startswith("dapiXXXX")
+#     or get_env("WAREHOUSE_ID") == "0123456789abcdef"
+#     or get_env("DATABRICKS_HOST").startswith("https://REPLACE-WORKSPACE")
+# )
 
 # Gold/base tables & views this app is allowed to touch — used for lineage
 # matching. Includes the two source tables plus the audit table.
