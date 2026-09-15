@@ -311,7 +311,7 @@ function renderForecast(){
       </div>
     </div>
     <div id="fcResult">${renderForecastResult()}</div>
-    <div class="footer-note">Predictions come from a self-hosted model on your own data &mdash; no data leaves your environment. TabPFN spec, Phase&nbsp;1. AI-generated; validate before customer-facing use.</div>
+    <div class="footer-note">.</div>
   `;
   // draw chart if we already have a result in state
   if(FC_STATE.result && !FC_STATE.error) drawForecastChart(FC_STATE.result);
@@ -483,7 +483,7 @@ function renderPortfolio(){
         </tbody>
       </table>
     </div>
-    <div class="footer-note">Portfolio totals aggregated across all ${clientKeys.length} accounts for the extract period. AI-generated. Validate with a qualified professional before using in customer-facing decisions.</div>
+    <div class="footer-note">.</div>
   `;
 
   destroyChart('pfTrend');
@@ -622,7 +622,7 @@ function renderShipTos(cd, ins){
         </tbody>
       </table>
     </div>
-    <div class="footer-note">AI-generated. Validate with a qualified professional before customer-facing use.</div>
+    <div class="footer-note">.</div>
   `;
 
   destroyChart('stTrend');
@@ -667,7 +667,7 @@ function renderTrends(cd, ins){
       <table><thead><tr><th>Ship-To</th><th>Category Opportunity</th><th>Peer Locations Buying It</th><th>Avg Peer Revenue</th></tr></thead>
       <tbody>${ins.whitespace.map(w=>`<tr class="clickable" onclick="setState({view:'shiptos', shipTo:'${w.ship_to.replace(/'/g,"\\'")}'})"><td><b>${w.ship_to}</b></td><td>${w.hier}</td><td>${w.peer_count}</td><td>${fmtMoney(w.avg_peer_revenue)}</td></tr>`).join('') || '<tr><td colspan="4" class="small-muted">No whitespace gaps detected.</td></tr>'}</tbody></table>
     </div>
-    <div class="footer-note">Growth calculated from ${ins.prior3_months.map(monthLabel).join('/')} vs ${ins.last3_months.map(monthLabel).join('/')}. AI-generated. Validate with a qualified professional.</div>
+    <div class="footer-note">.</div>
   `;
 }
 
@@ -694,7 +694,7 @@ function renderRisk(cd, ins){
     <div class="section-title">Order Type Mix by Ship-To</div>
     <table><thead><tr><th>Ship-To</th><th>Dominant Order Type</th><th>% of Revenue</th><th>JIT %</th><th>Stock %</th></tr></thead>
     <tbody>${ins.order_risk.map(o=>`<tr><td>${o.ship_to}</td><td>${o.dominant_type||'&mdash;'}</td><td>${fmtPct(o.dominant_pct)}</td><td>${fmtPct(o.jit_pct)}</td><td>${fmtPct(o.stock_pct)}</td></tr>`).join('')}</tbody></table>
-    <div class="footer-note">AI-generated. Validate with a qualified professional before renegotiating vendor terms.</div>
+    <div class="footer-note">.</div>
   `;
 
   destroyChart('supChart');
@@ -728,7 +728,7 @@ function renderBattleCard(cd, ins, bc){
       <div class="bc-card"><h4><span class="badge-icon ic-risk">!</span> Risks &amp; Renegotiation Points</h4><ul>${bc.risk_bullets.map(s=>`<li>${s}</li>`).join('')}</ul></div>
       <div class="bc-card"><h4><span class="badge-icon ic-play">&#9654;</span> Recommended Plays / Talk Track</h4><ul>${bc.plays.map(s=>`<li>${s}</li>`).join('')}</ul></div>
     </div>
-    <div class="footer-note">⚠️ DRAFT — FOR HUMAN REVIEW ONLY. Not reviewed by Fulcrum Legal, IT security, compliance, or clinical professionals. Do not share externally or with client. If in doubt please reach out to CISO@fulcrumdigital.com<br>AI-generated. Validate with a qualified professional.</div>
+    <div class="footer-note">.</div>
   `;
 }
 
