@@ -59,7 +59,7 @@ CONFIG = {
 
     # Auth token. On Databricks Apps, prefer the injected OAuth token; locally
     # you can drop a PAT here or in the DATABRICKS_TOKEN env var.
-    "DATABRICKS_TOKEN": get_env("DATABRICKS_TOKEN", "dapi292b54792c2b1cdfbe5096af695d0421-3"),  # dummy
+    "DATABRICKS_TOKEN": get_env("DATABRICKS_TOKEN", "dapie14d6a02c0a241dfe2ea1a34a26e6414-3"),  # dummy
 
     # Unity Catalog location of your two tables.
     "CATALOG": get_env("DBX_CATALOG", "ernest_dashbord_poc"),
