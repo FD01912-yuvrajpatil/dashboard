@@ -552,6 +552,7 @@ def genie_ask(question: str):
     mb = {}
     while time.time() < deadline:
         m = requests.get(msg_url, headers=_headers(), timeout=60, verify=VERIFY_SSL)
+        log.info("mm_response", m)
         m.raise_for_status()
         mb = m.json()
         status = mb.get("status")
