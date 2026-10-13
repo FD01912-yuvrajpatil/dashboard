@@ -29,6 +29,10 @@
   .client-btn.active{background:var(--teal);border-color:var(--teal);font-weight:700;color:#04231f;}
   .main{flex:1;padding:26px 32px 60px;max-width:1400px;}
   .topbar{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;}
+  .dl-btn{display:inline-flex;align-items:center;gap:7px;padding:8px 13px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--navy);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap;}
+  .dl-btn:hover{border-color:var(--teal);color:var(--teal);}
+  .dl-btn svg{width:15px;height:15px;}
+  .dl-btn.copied{border-color:var(--teal);color:var(--teal);}
   .topbar h1{font-size:24px;margin:0 0 4px;}
   .breadcrumb{font-size:13px;color:var(--sub);}
   .breadcrumb .crumb{cursor:pointer;color:var(--navy2);text-decoration:underline;}
@@ -267,7 +271,7 @@ function renderRolePicker(){
       <span class="role-pill ${state.role}">${roleLabel}</span>
     <select id="roleSelect" onchange="onRoleChange(this.value)" title="Switch role view">
         <option value="admin" ${state.role==='admin'?'selected':''}>Admin — all clients</option>
-        <option value="sales_rep" ${state.role==='sales_rep'?'selected':''}>Sales Rep — My clients</option>
+        <option value="sales_rep" ${state.role==='sales_rep'?'selected':''}>Sales Rep — My Clients</option>
     </select>`;
 }
 
@@ -779,9 +783,146 @@ function renderBattleCard(cd, ins, bc){
   `;
 }
 
+// ================= CSV REPORT DOWNLOAD (per view) =================
+// Turns a view's underlying data into a CSV the user can open in Excel.
+// Each builder returns { filename, rows } where rows is an array of arrays
+// (first row = headers). A generic fallback scrapes any rendered <table>.
+
+function csvEscape(v){
+  if(v===null||v===undefined) return '';
+  let s = String(v);
+  if(typeof v === 'number') return s;              // keep numbers raw
+  if(/[",\n]/.test(s)) s = '"' + s.replace(/"/g,'""') + '"';
+  return s;
+}
+function rowsToCsv(rows){
+  return rows.map(r => r.map(csvEscape).join(',')).join('\r\n');
+}
+function downloadCsv(filename, rows){
+  if(!rows || !rows.length){ alert('Nothing to export on this view yet.'); return; }
+  const csv = '\uFEFF' + rowsToCsv(rows);          // BOM so Excel reads UTF-8
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+function safeName(s){ return String(s||'report').replace(/[^\w.-]+/g,'_').slice(0,60); }
+function stamp(){ return new Date().toISOString().slice(0,10); }
+const n0 = (v)=> (v===null||v===undefined||v==='') ? '' : Number(v);
+
+// ---- per-view CSV builders ------------------------------------------------
+function csvForView(view){
+  try{
+    if(view==='portfolio') return csvPortfolio();
+    if(view==='overview')  return csvOverview();
+    if(view==='shiptos')   return csvShipTos();
+    if(view==='trends')    return csvTrends();
+    if(view==='risk')      return csvRisk();
+    if(view==='battlecard')return csvBattlecard();
+    if(view==='forecast')  return csvForecast();
+  }catch(e){ console.warn('csv builder failed, falling back to table scrape', e); }
+  return csvFromDomTables(view);   // governance views + any fallback
+}
+
+function csvPortfolio(){
+  const ks = Object.keys(DATA.clients||{});
+  const rows = [['Client','Revenue','GTM $','GTM %','Ship-To count']];
+  ks.map(k=>({k,c:DATA.clients[k]}))
+    .sort((a,b)=>(b.c.total_revenue||0)-(a.c.total_revenue||0))
+    .forEach(({k,c})=> rows.push([k, n0(c.total_revenue), n0(c.total_gtm),
+       (c.avg_gtm_pct!=null? Number(c.avg_gtm_pct).toFixed(1):''), (c.ship_tos||[]).length]));
+  return { filename:`portfolio_${stamp()}.csv`, rows };
+}
+function csvOverview(){
+  const c = DATA.clients[state.client]||{};
+  const rows = [['Month','Revenue','Cost','GTM $']];
+  (c.monthly||[]).forEach(m=> rows.push([m.month, n0(m.revenue), n0(m.cost), n0(m.gtm)]));
+  rows.push([]);
+  rows.push(['Order type','Value']);
+  (c.order_type_mix||[]).forEach(o=> rows.push([o.type||o.name, n0(o.val!=null?o.val:o.value)]));
+  return { filename:`${safeName(state.client)}_overview_${stamp()}.csv`, rows };
+}
+function csvShipTos(){
+  const c = DATA.clients[state.client]||{};
+  const rows = [['Ship-To','Revenue','Cost','GTM $','GTM %']];
+  const data = c.shipto_data||{};
+  const names = (c.ship_tos&&c.ship_tos.length)? c.ship_tos : Object.keys(data);
+  names.forEach(s=>{ const d = data[s]||{};
+    rows.push([s, n0(d.revenue), n0(d.cost), n0(d.gtm),
+      (d.gtm_pct!=null? Number(d.gtm_pct).toFixed(1):'')]); });
+  return { filename:`${safeName(state.client)}_shiptos_${stamp()}.csv`, rows };
+}
+function csvTrends(){
+  const ins = DATA.insights[state.client]||{};
+  const rows = [['Category','Detail']];
+  (ins.growth_bullets||ins.growth||[]).forEach(b=> rows.push(['Growth', typeof b==='string'?b:JSON.stringify(b)]));
+  (ins.whitespace||[]).forEach(b=> rows.push(['Whitespace / Cross-sell', typeof b==='string'?b:JSON.stringify(b)]));
+  return rows.length>1 ? { filename:`${safeName(state.client)}_growth_${stamp()}.csv`, rows }
+                       : csvFromDomTables('trends');
+}
+function csvRisk(){
+  const ins = DATA.insights[state.client]||{};
+  const rows = [['Risk','Detail']];
+  (ins.risk_bullets||ins.risks||[]).forEach(b=> rows.push(['Risk', typeof b==='string'?b:JSON.stringify(b)]));
+  return rows.length>1 ? { filename:`${safeName(state.client)}_risk_${stamp()}.csv`, rows }
+                       : csvFromDomTables('risk');
+}
+function csvBattlecard(){ return csvFromDomTables('battlecard', `${safeName(state.client)}_battlecard_${stamp()}.csv`); }
+function csvForecast(){
+  // export the forecast series if one has been run (FC_STATE.result)
+  const rows = [['Month','Point','Lower','Upper','Type']];
+  const r = (typeof FC_STATE!=='undefined' && FC_STATE.result) ? FC_STATE.result : null;
+  if(r){
+    (r.history||[]).forEach(h=> rows.push([h.month, n0(h.value!=null?h.value:h.point), '', '', 'history']));
+    (r.forecast||[]).forEach(f=> rows.push([f.month, n0(f.point), n0(f.lower), n0(f.upper), 'forecast']));
+  }
+  const label = r && r.target_label ? safeName(r.target_label) : 'forecast';
+  return rows.length>1 ? { filename:`${label}_forecast_${stamp()}.csv`, rows } : csvFromDomTables('forecast');
+}
+
+// Generic fallback: serialize the first data table rendered in #main.
+function csvFromDomTables(view, filename){
+  const main = document.getElementById('main');
+  const table = main && main.querySelector('table');
+  if(!table) return { filename: filename||`${view}_${stamp()}.csv`, rows: [] };
+  const rows = [];
+  table.querySelectorAll('tr').forEach(tr=>{
+    const cells = [...tr.querySelectorAll('th,td')].map(td=> td.innerText.trim());
+    if(cells.length) rows.push(cells);
+  });
+  return { filename: filename||`${view}_${stamp()}.csv`, rows };
+}
+
+function downloadCurrentView(){
+  const { filename, rows } = csvForView(state.view);
+  downloadCsv(filename, rows);
+}
+
+// Inject a "Download CSV" button into the current view's .topbar (right side).
+// One hook covers every view, so individual render functions stay untouched.
+const DOWNLOADABLE_VIEWS = ['portfolio','overview','shiptos','trends','risk','battlecard','forecast'];
+function injectDownloadButton(){
+  if(!DOWNLOADABLE_VIEWS.includes(state.view)) return;
+  const bar = document.querySelector('#main .topbar');
+  if(!bar || bar.querySelector('.dl-btn')) return;
+  const btn = document.createElement('button');
+  btn.className = 'dl-btn';
+  btn.title = 'Download this view as CSV';
+  btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download CSV`;
+  btn.onclick = downloadCurrentView;
+  bar.appendChild(btn);
+}
+
 function render(){
   renderSidebar();
   renderTopNav();
+  // Add the Download-CSV button after the view paints — in a rAF so it runs even
+  // if a view's chart code throws mid-render (the button never depends on it).
+  requestAnimationFrame(injectDownloadButton);
   if(state.view==='portfolio'){ renderPortfolio(); return; }
   // Governance views don't depend on client data — dispatch them first.
   if(state.view==='guardrails'){ renderGuardrails(); return; }
@@ -1398,6 +1539,7 @@ async function boot(){
     state.client = CLIENTS[0];
     document.getElementById('loadingOverlay').style.display = 'none';
     document.getElementById('appRoot').style.display = 'flex';
+    renderRolePicker();   
     render();
     initGeniePanel();
   }catch(e){
