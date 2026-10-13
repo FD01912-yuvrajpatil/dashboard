@@ -59,7 +59,7 @@ CONFIG = {
 
     # Auth token. On Databricks Apps, prefer the injected OAuth token; locally
     # you can drop a PAT here or in the DATABRICKS_TOKEN env var.
-    "DATABRICKS_TOKEN": get_env("DATABRICKS_TOKEN", "dapie14d6a02c0a241dfe2ea1a34a26e6414-3"),  # dummy
+    "DATABRICKS_TOKEN": get_env("DATABRICKS_TOKEN", "dapie14d6a02c0a241dfe2ea1a34a26e6414-3 "),  # dummy
 
     # Unity Catalog location of your two tables.
     "CATALOG": get_env("DBX_CATALOG", "ernest_dashbord_poc"),
@@ -709,9 +709,9 @@ HITL_CONF = int(os.environ.get("HITL_CONF", "65"))  # confidence below this -> H
 #     or CONFIG["DATABRICKS_HOST"].startswith("https://REPLACE-WORKSPACE")
 # )
 LIVE = not (
-    get_env("DATABRICKS_TOKEN").startswith("dapiXXXX")
-    or get_env("WAREHOUSE_ID") == "0123456789abcdef"
-    or get_env("DATABRICKS_HOST").startswith("https://REPLACE-WORKSPACE")
+     CONFIG["DATABRICKS_TOKEN"].startswith("dapiXXXX")
+     or CONFIG["WAREHOUSE_ID"] == "0123456789abcdef"
+     or CONFIG["DATABRICKS_HOST"].startswith("https://REPLACE-WORKSPACE")
 )
 
 # Gold/base tables & views this app is allowed to touch — used for lineage
