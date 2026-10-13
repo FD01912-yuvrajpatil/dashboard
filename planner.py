@@ -270,9 +270,16 @@ def _normalise_llm(data: dict, entities: dict) -> dict:
 # provider calls (kept tiny and single-purpose)
 # ---------------------------------------------------------------------------
 def _call_anthropic(system: str, user: str):
-    key = os.environ.get("ANTHROPIC_API_KEY")
+    #key = os.environ.get("ANTHROPIC_API_KEY")
+    key = (os.environ.get("ANTHROPIC_API_KEY") or "").strip().strip('"').strip("'")
+    log.info("PLANNER_MODEL=%r", PLANNER_MODEL)
+    log.info(key)
     if not key:
-        return None
+        raise RuntimeError("ANTHROPIC_API_KEY is empty in this process — the env var "
+                        "isn't set where the server runs.")
+    if not key.startswith("sk-ant-"):
+        log.warning("ANTHROPIC_API_KEY doesn't look like an Anthropic key (starts %r); "
+                    "a dapi…/OAuth/Bedrock token will 401.", key[:7])
     import requests
     r = requests.post(
         "https://api.anthropic.com/v1/messages",
@@ -282,9 +289,17 @@ def _call_anthropic(system: str, user: str):
               "messages": [{"role": "user", "content": user}]},
         timeout=30,
     )
+
+
+    if not r.ok:
+        # surface Anthropic's actual reason instead of a bare 400
+        log.error("Anthropic %s body=%s", r.status_code, r.text[:800])
+        log.error("sent model=%r system_type=%s user_type=%s",
+                PLANNER_MODEL, type(system).__name__, type(user).__name__)
     r.raise_for_status()
     body = r.json()
     parts = [b.get("text", "") for b in body.get("content", []) if b.get("type") == "text"]
+    log.info("".join(parts).strip())
     return "".join(parts).strip()
 
 

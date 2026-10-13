@@ -103,6 +103,10 @@
   .genie-input:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px rgba(15,181,174,.15);}
   .genie-btn{padding:12px 20px;border:none;border-radius:10px;background:var(--teal);color:#04231f;font-weight:700;font-size:14px;cursor:pointer;}
   .genie-btn:disabled{opacity:.55;cursor:not-allowed;}
+  .dash-btn{padding:8px 14px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--navy2);font:inherit;font-size:13px;font-weight:600;cursor:pointer;}
+  .dash-btn:hover{border-color:var(--teal);}
+  .pin-btn{padding:7px 14px;border:none;border-radius:8px;background:var(--navy);color:#fff;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;}
+  .pin-btn:hover{background:var(--navy2);}
   .genie-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;}
   .genie-chip{padding:7px 12px;border:1px solid var(--border);background:#fff;border-radius:20px;font-size:12.5px;color:var(--navy2);cursor:pointer;}
   .genie-chip:hover{border-color:var(--teal);background:#f0fbfa;}
@@ -112,6 +116,15 @@
   .genie-sql{background:#0b2545;color:#d7e6f7;border-radius:8px;padding:12px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;overflow-x:auto;white-space:pre;margin-bottom:12px;}
   .genie-thinking{display:flex;align-items:center;gap:10px;color:var(--sub);font-size:13.5px;}
   .genie-thinking .spinner{width:20px;height:20px;border-width:3px;}
+  /* ---- unified query panel (Option B) ---- */
+  .route-badge{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.03em;padding:2px 8px;border-radius:20px;margin-bottom:8px;text-transform:uppercase;}
+  .route-badge.predict{background:#e6f7f5;color:#0a6b64;}
+  .route-badge.retrieve{background:#eef2f7;color:#2c4a63;}
+  .route-badge .meth{opacity:.7;font-weight:600;}
+  .genie-answer .fc-mini{position:relative;height:180px;margin:10px 0 6px;}
+  .genie-answer .unc-line{font-size:12px;color:var(--sub);margin:4px 0 8px;}
+  .selfcheck-note{font-size:11.5px;color:#8a5a00;background:#fdf6e6;border:1px solid #f0e0b8;border-radius:6px;padding:6px 9px;margin-top:8px;}
+  .fallback-note{font-size:11.5px;color:#2c4a63;background:#eef4fb;border:1px solid #d3e2f0;border-radius:6px;padding:6px 9px;margin-bottom:8px;}
   /* ---- forecast controls ---- */
   .fc-controls{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;}
   .fc-field{display:flex;flex-direction:column;gap:5px;}
@@ -133,7 +146,14 @@
   .genie-panel .genie-answer{padding:14px 15px;}
   .genie-panel .genie-sql{font-size:11.5px;}
   @media(max-width:1100px){ .genie-panel{width:300px;flex-basis:300px;} }
-</style>
+  /* ---- governance top-nav tabs ---- */
+  .main-wrap{flex:1;display:flex;flex-direction:column;min-width:0;}
+  .topnav{display:flex;gap:4px;padding:0 24px;background:var(--card);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20;overflow-x:auto;}
+  .topnav .tab{padding:14px 16px 12px;font-size:13.5px;font-weight:600;color:var(--sub);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:.15s;}
+  .topnav .tab:hover{color:var(--navy);}
+  .topnav .tab.active{color:var(--navy);border-bottom-color:var(--orange);}
+  .main-wrap .main{flex:1;}
+  </style>
 </head>
 
 <body>
@@ -147,15 +167,18 @@
       <div class="name">ERNEST</div>
       <div class="sub">Account Intelligence &middot; Strategic Selling</div>
     </div>
-    <div class="client-switch" id="clientSwitch"></div>
     <div class="navsec">Analyze</div>
     <div id="navItems"></div>
+    <div class="client-switch" id="clientSwitch"></div>
   </div>
-  <div class="main" id="main"></div>
+  <div class="main-wrap">
+    <div class="topnav" id="topNav"></div>
+    <div class="main" id="main"></div>
+  </div>
   <aside class="genie-panel" id="geniePanel">
     <div class="genie-panel-head">
       <div class="gp-title">DATA ZEN <span class="gp-badge">AI/BI</span></div>
-      <div class="gp-sub">Natural language &rarr; Your Data</div>
+      <div class="gp-sub">Retrieval &amp; forecasts &middot; auto-routed</div>
     </div>
     <div class="genie-panel-body">
       <div class="genie-box">
@@ -197,15 +220,28 @@ function renderSidebar(){
     ['trends','Growth & Cross-Sell'],
     ['risk','Risk Radar'],
     ['battlecard','Battle Card'],
-    ['guardrails','\uD83D\uDEE1 Guardrails'],
-    ['audit','\uD83D\uDCCB Audit Trail'],
-    ['lineage','\uD83D\uDD17 Lineage'],
-    ['forecast','Forecast (TabPFN)'],
+    ['forecast','Forecast'],
+    
   ];
   const nav = document.getElementById('navItems');
   nav.innerHTML = items.map(([key,label]) => {
     const active = key===state.view ? 'active':'';
     return `<div class="navitem ${active}" onclick="setState({view:'${key}', shipTo:null})"><span class="dot"></span>${label}</div>`;
+  }).join('');
+}
+
+function renderTopNav(){
+  const tabs = [
+    ['guardrails','\uD83D\uDEE1 Guardrails'],
+    ['audit','\uD83D\uDCCB Audit Trail'],
+    ['lineage','\uD83D\uDD17 Lineage'],
+     ['dashboard','\uD83D\uDCCC My Dashboard'],
+  ];
+  const nav = document.getElementById('topNav');
+  if(!nav) return;
+  nav.innerHTML = tabs.map(([key,label]) => {
+    const active = key===state.view ? 'active':'';
+    return `<div class="tab ${active}" onclick="setState({view:'${key}', shipTo:null})">${label}</div>`;
   }).join('');
 }
 
@@ -254,7 +290,7 @@ function renderForecast(){
   const horizons = [1,2,3,6,9,12];
 
   document.getElementById('main').innerHTML = `
-    <div class="topbar"><div><h1>Forecast <span class="tag">TabPFN prediction</span></h1><div class="breadcrumb">Project a metric forward with an uncertainty band</div></div></div>
+    <div class="topbar"><div><h1>Forecast <span class="tag">/ prediction</span></h1><div class="breadcrumb">Project a metric forward with an uncertainty band</div></div></div>
     <div class="card">
       <div class="fc-controls">
         <div class="fc-field"><label>Metric</label>
@@ -275,7 +311,7 @@ function renderForecast(){
       </div>
     </div>
     <div id="fcResult">${renderForecastResult()}</div>
-    <div class="footer-note">Predictions come from a self-hosted model on your own data &mdash; no data leaves your environment. TabPFN spec, Phase&nbsp;1. AI-generated; validate before customer-facing use.</div>
+    <div class="footer-note">.</div>
   `;
   // draw chart if we already have a result in state
   if(FC_STATE.result && !FC_STATE.error) drawForecastChart(FC_STATE.result);
@@ -447,7 +483,7 @@ function renderPortfolio(){
         </tbody>
       </table>
     </div>
-    <div class="footer-note">Portfolio totals aggregated across all ${clientKeys.length} accounts for the extract period. AI-generated. Validate with a qualified professional before using in customer-facing decisions.</div>
+    <div class="footer-note">.</div>
   `;
 
   destroyChart('pfTrend');
@@ -505,7 +541,7 @@ function renderOverview(cd, ins){
         </tbody>
       </table>
     </div>
-    <div class="footer-note">Data reflects the extract period Jul 2025 &ndash; Jul 2026. AI-generated. Validate with a qualified professional before using in customer-facing decisions.</div>
+    <div class="footer-note">.</div>
   `;
 
   destroyChart('trendChart');
@@ -586,7 +622,7 @@ function renderShipTos(cd, ins){
         </tbody>
       </table>
     </div>
-    <div class="footer-note">AI-generated. Validate with a qualified professional before customer-facing use.</div>
+    <div class="footer-note">.</div>
   `;
 
   destroyChart('stTrend');
@@ -631,7 +667,7 @@ function renderTrends(cd, ins){
       <table><thead><tr><th>Ship-To</th><th>Category Opportunity</th><th>Peer Locations Buying It</th><th>Avg Peer Revenue</th></tr></thead>
       <tbody>${ins.whitespace.map(w=>`<tr class="clickable" onclick="setState({view:'shiptos', shipTo:'${w.ship_to.replace(/'/g,"\\'")}'})"><td><b>${w.ship_to}</b></td><td>${w.hier}</td><td>${w.peer_count}</td><td>${fmtMoney(w.avg_peer_revenue)}</td></tr>`).join('') || '<tr><td colspan="4" class="small-muted">No whitespace gaps detected.</td></tr>'}</tbody></table>
     </div>
-    <div class="footer-note">Growth calculated from ${ins.prior3_months.map(monthLabel).join('/')} vs ${ins.last3_months.map(monthLabel).join('/')}. AI-generated. Validate with a qualified professional.</div>
+    <div class="footer-note">.</div>
   `;
 }
 
@@ -658,7 +694,7 @@ function renderRisk(cd, ins){
     <div class="section-title">Order Type Mix by Ship-To</div>
     <table><thead><tr><th>Ship-To</th><th>Dominant Order Type</th><th>% of Revenue</th><th>JIT %</th><th>Stock %</th></tr></thead>
     <tbody>${ins.order_risk.map(o=>`<tr><td>${o.ship_to}</td><td>${o.dominant_type||'&mdash;'}</td><td>${fmtPct(o.dominant_pct)}</td><td>${fmtPct(o.jit_pct)}</td><td>${fmtPct(o.stock_pct)}</td></tr>`).join('')}</tbody></table>
-    <div class="footer-note">AI-generated. Validate with a qualified professional before renegotiating vendor terms.</div>
+    <div class="footer-note">.</div>
   `;
 
   destroyChart('supChart');
@@ -692,18 +728,20 @@ function renderBattleCard(cd, ins, bc){
       <div class="bc-card"><h4><span class="badge-icon ic-risk">!</span> Risks &amp; Renegotiation Points</h4><ul>${bc.risk_bullets.map(s=>`<li>${s}</li>`).join('')}</ul></div>
       <div class="bc-card"><h4><span class="badge-icon ic-play">&#9654;</span> Recommended Plays / Talk Track</h4><ul>${bc.plays.map(s=>`<li>${s}</li>`).join('')}</ul></div>
     </div>
-    <div class="footer-note">⚠️ DRAFT — FOR HUMAN REVIEW ONLY. Not reviewed by Fulcrum Legal, IT security, compliance, or clinical professionals. Do not share externally or with client. If in doubt please reach out to CISO@fulcrumdigital.com<br>AI-generated. Validate with a qualified professional.</div>
+    <div class="footer-note">.</div>
   `;
 }
 
 function render(){
   renderSidebar();
+  renderTopNav();
   if(state.view==='portfolio'){ renderPortfolio(); return; }
   // Governance views don't depend on client data — dispatch them first.
   if(state.view==='guardrails'){ renderGuardrails(); return; }
   if(state.view==='audit'){ renderAudit(); return; }
   if(state.view==='lineage'){ renderLineage(); return; }
   if(state.view==='forecast'){ renderForecast(); return; }
+   if(state.view==='dashboard'){ renderDashboard(); return; }
 
   const cd = DATA.clients[state.client];
   const ins = DATA.insights[state.client];
@@ -903,6 +941,7 @@ let GENIE_HISTORY = [];
 
 function initGeniePanel(){
   const suggestions = [
+    "Forecast revenue next quarter",
     "Top 10 ship-to locations by revenue",
     "Which product hierarchies have the lowest GTM %?",
     "Show materials with PO variance over 20%",
@@ -915,57 +954,319 @@ function initGeniePanel(){
       `<span class="genie-chip" onclick="document.getElementById('genieInput').value='${s.replace(/'/g,"\\'")}';askGenie()">${s}</span>`
     ).join('');
   }
-  const res = document.getElementById('genieResults');
-  if(res){ res.innerHTML = GENIE_HISTORY.map(renderGenieCard).join(''); }
+  paintGenie();
 }
 
 function renderGenieCard(item){
   if(item.pending){
     return `<div class="genie-answer"><div class="qtext">${escapeHtml(item.question)}</div>
-      <div class="genie-thinking"><div class="spinner"></div> Genie is thinking&hellip;</div></div>`;
+      <div class="genie-thinking"><div class="spinner"></div> ${escapeHtml(item.thinking||'Working on it…')}</div></div>`;
   }
   if(item.error){
     return `<div class="genie-answer"><div class="qtext">${escapeHtml(item.question)}</div>
-      <div class="load-err"><b>Genie error:</b> ${escapeHtml(item.error)}</div></div>`;
+      <div class="load-err"><b>Error:</b> ${escapeHtml(item.error)}</div></div>`;
   }
-  let rowsHtml = '';
-  if(item.rows && item.rows.length){
-    const cols = item.columns && item.columns.length ? item.columns : Object.keys(item.rows[0]);
+  const env = item.result || {};
+  const kind = env.kind || 'retrieval';
+  const routing = env.routing || {};
+  const badge = kind==='prediction'
+    ? `<span class="route-badge predict">Forecast <span class="meth">· ${escapeHtml(routing.method||'')}</span></span>`
+    : `<span class="route-badge retrieve">Retrieval <span class="meth">· ${escapeHtml(routing.method||'')}</span></span>`;
+  const fallback = routing.fallback
+    ? `<div class="fallback-note">Tried a forecast but ${escapeHtml(routing.fallback)} — answered from data instead.</div>` : '';
+
+  // prediction body: answer + inline confidence-band chart
+  if(kind==='prediction' && env.chart){
+    const chartId = 'gcChart_'+item.id;
+    const u = env.uncertainty||{};
+    return `<div class="genie-answer">
+      <div class="qtext">${escapeHtml(item.question)}</div>
+      ${badge}${fallback}
+      <div class="atext" style="font-size:13.5px;line-height:1.55;color:#333e49;">${escapeHtml(env.answer||'')}</div>
+      <div class="fc-mini"><canvas id="${chartId}"></canvas></div>
+      ${selfCheckHtml(env.self_check)}
+    </div>`;
+  }
+
+  // retrieval body: answer + optional table
+  let rowsHtml='';
+  const table = env.table;
+  if(table && table.rows && table.rows.length){
+    const cols = table.columns && table.columns.length ? table.columns : Object.keys(table.rows[0]);
     rowsHtml = `<table><thead><tr>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>
-      <tbody>${item.rows.slice(0,25).map(r=>`<tr>${cols.map(c=>`<td>${escapeHtml(String(r[c]??''))}</td>`).join('')}</tr>`).join('')}</tbody></table>
-      ${item.rows.length>25?`<div class="small-muted" style="margin-top:8px;">Showing 25 of ${item.rows.length} rows.</div>`:''}`;
+      <tbody>${table.rows.slice(0,25).map(r=>`<tr>${cols.map(c=>`<td>${escapeHtml(String(r[c]??''))}</td>`).join('')}</tr>`).join('')}</tbody></table>
+      ${table.rows.length>25?`<div class="small-muted" style="margin-top:8px;">Showing 25 of ${table.rows.length} rows.</div>`:''}`;
+  }
+  let pinHtml = '';
+  if(item.sql && item.rows && item.rows.length){
+    const gi = GENIE_HISTORY.indexOf(item);
+    pinHtml = `<div style="margin-top:12px;text-align:right">
+      <button class="pin-btn" onclick="pinInsight(${gi})">📌 Pin to Dashboard</button></div>`;
   }
   return `<div class="genie-answer">
     <div class="qtext">${escapeHtml(item.question)}</div>
-    <!-- ${item.text?`<div class="atext">${escapeHtml(item.text)}</div>`:''}  -->
-    <!-- ${item.sql?`<div class="genie-sql">${escapeHtml(item.sql)}</div>`:''} -->
+    ${badge}${fallback}
+    ${env.answer?`<div class="atext" style="font-size:13.5px;line-height:1.55;color:#333e49;margin-bottom:8px;">${escapeHtml(env.answer)}</div>`:''}
+    ${env.sql?`<div class="genie-sql">${escapeHtml(env.sql)}</div>`:''}
     ${rowsHtml}
+    ${selfCheckHtml(env.self_check)}
   </div>`;
+}
+
+// Pin a Genie result to My Dashboard (saves via backend).
+async function pinInsight(idx){
+  const item = GENIE_HISTORY[idx];
+  if(!item || !item.sql) return;
+  const title = (item.question || 'Saved insight').slice(0,80);
+  try{
+    await apiPost('/api/dashboard/insights', {
+      title, question: item.question, sql: item.sql,
+      chart_type: 'table', persona: 'Analyst', is_shared: false,
+      rows: item.rows || []
+    });
+    flashToast('📌 Pinned to My Dashboard');
+  }catch(e){ flashToast('Pin failed: ' + e.message); }
+}
+function flashToast(msg){
+  let t = document.getElementById('miniToast');
+  if(!t){ t = document.createElement('div'); t.id='miniToast';
+    t.style.cssText='position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 6px 20px rgba(0,0,0,.25);transition:opacity .3s';
+    document.body.appendChild(t); }
+  t.textContent = msg; t.style.opacity='1';
+  clearTimeout(window._miniToastT);
+  window._miniToastT = setTimeout(()=>{ t.style.opacity='0'; }, 2200);
+}
+
+
+function selfCheckHtml(sc){
+  if(!sc || sc.status==='ok') return '';
+  return `<div class="selfcheck-note">${escapeHtml(sc.note||'This answer may be incomplete.')}</div>`;
+}
+
+// Draw the inline prediction chart for a card (reuses the forecast chart shape).
+function drawCardChart(item){
+  const env = item.result||{};
+  if(env.kind!=='prediction' || !env.chart) return;
+  const el = document.getElementById('gcChart_'+item.id);
+  if(!el || typeof Chart==='undefined') return;
+  const c = env.chart;
+  const histLabels = c.history.map(h=>h.month);
+  const fcLabels = c.forecast.map(f=>f.month);
+  const labels = histLabels.concat(fcLabels);
+  const nH=histLabels.length, nF=fcLabels.length;
+  const seam = nH? c.history[nH-1].value : null;
+  const histLine = c.history.map(h=>h.value).concat(new Array(nF).fill(null));
+  const centralLine = new Array(nH-1).fill(null).concat([seam]).concat(c.forecast.map(f=>f.point));
+  const lowerLine = new Array(nH).fill(null).concat(c.forecast.map(f=>f.lower));
+  const upperLine = new Array(nH).fill(null).concat(c.forecast.map(f=>f.upper));
+  if(charts['gcChart_'+item.id]){ try{charts['gcChart_'+item.id].destroy();}catch(e){} }
+  charts['gcChart_'+item.id] = new Chart(el,{ type:'line',
+    data:{ labels, datasets:[
+      {label:'Upper', data:upperLine, borderColor:'rgba(15,181,174,0)', backgroundColor:'rgba(15,181,174,0.15)', pointRadius:0, fill:'+1', tension:.3},
+      {label:'Lower', data:lowerLine, borderColor:'rgba(15,181,174,0)', backgroundColor:'rgba(15,181,174,0.15)', pointRadius:0, fill:false, tension:.3},
+      {label:'Forecast', data:centralLine, borderColor:'#0fb5ae', borderWidth:2, borderDash:[5,4], pointRadius:1.5, tension:.3},
+      {label:'History', data:histLine, borderColor:'#0b2545', borderWidth:2, pointRadius:1.5, tension:.3},
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false}},
+      scales:{ y:{beginAtZero:false, ticks:{font:{size:9}}}, x:{ticks:{font:{size:8},maxRotation:0,autoSkip:true,maxTicksLimit:6}} } }
+  });
 }
 
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
+let GC_SEQ = 0;
 async function askGenie(){
   const input = document.getElementById('genieInput');
   const q = (input.value||'').trim();
   if(!q) return;
   input.value = '';
-  const item = { question:q, pending:true };
+  const item = { id: ++GC_SEQ, question:q, pending:true, thinking:'Deciding how to answer…' };
   GENIE_HISTORY.unshift(item);
-  document.getElementById('genieResults').innerHTML = GENIE_HISTORY.map(renderGenieCard).join('');
+  paintGenie();
   try{
-    const res = await fetch('/api/genie/ask', {
+    const res = await fetch('/api/query', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({question:q})
     });
     const data = await res.json();
-    Object.assign(item, {pending:false}, data);
-    if(data.error) item.error = data.error;
+    item.pending = false;
+    if(data.error){ item.error = data.error; }
+    else { item.result = data; }
   }catch(e){
     item.pending = false; item.error = e.message;
   }
-  document.getElementById('genieResults').innerHTML = GENIE_HISTORY.map(renderGenieCard).join('');
+  paintGenie();
 }
+
+// Repaint the results feed, then (re)draw any prediction charts that are now in the DOM.
+function paintGenie(){
+  const el = document.getElementById('genieResults');
+  if(!el) return;
+  el.innerHTML = GENIE_HISTORY.map(renderGenieCard).join('');
+  GENIE_HISTORY.forEach(it=>{ if(it.result && it.result.kind==='prediction') drawCardChart(it); });
+}
+
+// ================= MY DASHBOARD (saved insights) =================
+async function apiGet(p){ const r = await fetch(p); return r.json(); }
+async function apiPost(p, b){
+  const r = await fetch(p, {method:'POST', headers:{'Content-Type':'application/json'},
+                           body: JSON.stringify(b||{})});
+  return r.json();
+}
+async function apiDelete(p){ const r = await fetch(p, {method:'DELETE'}); return r.json(); }
+
+let DASH_INSIGHTS = [];
+
+async function renderDashboard(){
+  const main = document.getElementById('main');
+  main.innerHTML = `
+    <div class="topbar">
+      <div><h1>&#128204; My Dashboard</h1>
+        <div class="breadcrumb">Your saved insights, live from Delta Lake.</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="dash-btn" onclick="renderDashboard()">&#8635; Refresh</button>
+      </div>
+    </div>
+    <div id="dashHint" class="small-muted" style="margin-bottom:14px"></div>
+    <div id="dashEmpty" style="display:none;padding:44px;text-align:center;color:var(--sub);
+         border:1px dashed var(--border);border-radius:12px;background:#fff">
+      <div style="font-size:30px;margin-bottom:10px">&#128204;</div>
+      <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px">No saved insights yet</div>
+      <div style="font-size:13px">Ask a question in the DATA ZEN panel, then click
+        <b>&#128204; Pin to Dashboard</b>.</div>
+    </div>
+    <div id="dashLoading" style="padding:24px;text-align:center;color:var(--sub);font-size:13px">
+      Loading insights&hellip;</div>
+    <div id="dashGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px"></div>`;
+
+  const d = await apiGet('/api/dashboard/insights?persona=Analyst');
+  document.getElementById('dashLoading').style.display = 'none';
+  document.getElementById('dashHint').textContent =
+    d.live ? 'Live · Databricks Delta' : 'In-memory mode — pinned insights persist for this session';
+  DASH_INSIGHTS = d.insights || [];
+  if(!DASH_INSIGHTS.length){ document.getElementById('dashEmpty').style.display='block'; return; }
+  renderDashGrid();
+  // hydrate each card's data (runs its stored SQL)
+  DASH_INSIGHTS.forEach(hydrateInsight);
+}
+
+function renderDashGrid(){
+  const grid = document.getElementById('dashGrid');
+  if(!grid) return;
+  grid.innerHTML = DASH_INSIGHTS.map(ins =>
+    `<div id="dash-card-${ins.id}" class="card" style="padding:0;overflow:hidden">
+       ${dashCardInner(ins)}</div>`).join('');
+}
+
+function dashCardInner(ins){
+  const rows = ins.rows || [];
+  const ct = ins.chart_type || 'table';
+  const vizBtns = ['table','bar','kpi'].map(t=>{
+    const icon = t==='table'?'\u229E':t==='bar'?'\u25A6':'\u25C8';
+    const on = ct===t ? 'background:var(--teal);color:#04231f' : 'background:#eef2f7;color:var(--navy2)';
+    return `<button onclick="switchDashViz('${ins.id}','${t}')" title="${t}"
+      style="padding:3px 8px;border:none;border-radius:4px;font-size:11px;cursor:pointer;${on}">${icon}</button>`;
+  }).join('');
+  const header = `<div style="padding:12px 14px;border-bottom:1px solid var(--border);
+      display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+    <div style="min-width:0">
+      <div style="font-size:14px;font-weight:700;color:var(--navy);overflow:hidden;
+        text-overflow:ellipsis;white-space:nowrap">${escapeHtml(ins.title)}</div>
+      <div style="font-size:10.5px;color:var(--sub);margin-top:2px">
+        ${escapeHtml(ins.persona||'—')} &middot; ${escapeHtml(ins.created_at||'—')}
+        ${ins.is_shared?' &middot; 🌐 shared':''}</div>
+    </div>
+    <div style="display:flex;gap:4px;flex-shrink:0">${vizBtns}
+      <button onclick="removeInsight('${ins.id}')" title="Delete"
+        style="padding:3px 8px;border:none;border-radius:4px;background:#fdeceb;color:var(--red);
+        font-size:11px;cursor:pointer">&#10005;</button>
+    </div></div>`;
+  let body = `<div style="padding:12px 14px;min-height:70px">`;
+  if(!rows.length){
+    body += `<div style="color:var(--sub);font-size:12px;text-align:center;padding:14px 0">&#8635; Loading data&hellip;</div>`;
+  } else if(ct==='bar'){
+    body += dashBar(rows);
+  } else if(ct==='kpi'){
+    body += dashKpi(rows);
+  } else {
+    body += dashTable(rows);
+  }
+  body += `</div>`;
+  const footer = `<div style="padding:8px 14px;border-top:1px solid var(--border);background:#f7fafc">
+    <div style="font-size:10.5px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;
+      white-space:nowrap" title="${escapeHtml(ins.question||'')}">Q: ${escapeHtml(ins.question||'—')}</div></div>`;
+  return header + body + footer;
+}
+
+// --- lightweight viz renderers (pure HTML/CSS, no chart lib needed) ---
+function numericCol(rows){
+  const cols = Object.keys(rows[0]);
+  return cols.find(c => rows.every(r => r[c]!==null && r[c]!=='' && !isNaN(parseFloat(r[c])))) || cols[cols.length-1];
+}
+function labelCol(rows){
+  const cols = Object.keys(rows[0]);
+  return cols.find(c => isNaN(parseFloat(rows[0][c]))) || cols[0];
+}
+function dashTable(rows){
+  const cols = Object.keys(rows[0]);
+  return `<div style="font-size:11.5px"><table style="width:100%">
+    <thead><tr>${cols.map((c,i)=>`<th style="${i>0?'text-align:right':''}">${escapeHtml(c.replace(/_/g,' '))}</th>`).join('')}</tr></thead>
+    <tbody>${rows.slice(0,6).map(r=>`<tr>${cols.map((c,i)=>
+      `<td style="${i>0?'text-align:right;font-variant-numeric:tabular-nums':''}">${escapeHtml(String(r[c]??''))}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table></div>`;
+}
+function dashBar(rows){
+  const lab = labelCol(rows), num = numericCol(rows);
+  const max = Math.max(...rows.map(r=>parseFloat(r[num])||0)) || 1;
+  return rows.slice(0,6).map(r=>{
+    const v = parseFloat(r[num])||0, w = Math.round(v/max*100);
+    return `<div style="margin:6px 0">
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px">
+        <span>${escapeHtml(String(r[lab]??''))}</span>
+        <span style="color:var(--sub);font-variant-numeric:tabular-nums">${escapeHtml(String(r[num]??''))}</span></div>
+      <div style="height:8px;background:#eef2f7;border-radius:4px;overflow:hidden">
+        <div style="height:100%;width:${w}%;background:var(--teal)"></div></div></div>`;
+  }).join('');
+}
+function dashKpi(rows){
+  const num = numericCol(rows);
+  const total = rows.reduce((a,r)=>a+(parseFloat(r[num])||0),0);
+  return `<div style="display:flex;flex-direction:column;align-items:center;padding:10px 0">
+    <div style="font-size:28px;font-weight:800;color:var(--navy)">${total.toLocaleString()}</div>
+    <div style="font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;margin-top:2px">
+      total ${escapeHtml(num.replace(/_/g,' '))} · ${rows.length} rows</div></div>`;
+}
+
+async function hydrateInsight(ins){
+  if(ins.rows && ins.rows.length) { return; } // already have data (just-pinned)
+  try{
+    const d = await apiPost('/api/dashboard/insight/run', {sql: ins.sql});
+    ins.rows = d.rows || [];
+    const card = document.getElementById('dash-card-'+ins.id);
+    if(card) card.innerHTML = dashCardInner(ins);
+  }catch(e){ /* leave loading state */ }
+}
+
+async function switchDashViz(insId, ct){
+  const ins = DASH_INSIGHTS.find(i => String(i.id)===String(insId));
+  if(!ins) return;
+  ins.chart_type = ct;
+  const card = document.getElementById('dash-card-'+insId);
+  if(card) card.innerHTML = dashCardInner(ins);
+  apiPost('/api/dashboard/insights/'+insId+'/chart', {chart_type: ct}); // fire-and-forget
+}
+
+async function removeInsight(insId){
+  await apiDelete('/api/dashboard/insights/'+insId);
+  DASH_INSIGHTS = DASH_INSIGHTS.filter(i => String(i.id)!==String(insId));
+  if(!DASH_INSIGHTS.length){
+    document.getElementById('dashGrid').innerHTML='';
+    document.getElementById('dashEmpty').style.display='block';
+  } else { renderDashGrid(); DASH_INSIGHTS.forEach(hydrateInsight); }
+  flashToast('Insight deleted');
+}
+
 
 // ---------------- BOOTSTRAP: fetch live data then render ----------------
 async function boot(){

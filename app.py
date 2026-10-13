@@ -29,7 +29,7 @@ import threading
 import requests
 from datetime import datetime
 from flask import Flask, jsonify, request, send_from_directory
-
+import json
 from variable import get_env
 
 app = Flask(__name__)
@@ -525,6 +525,74 @@ def _shape_battlecard(client, cd, ins, months):
 # ============================================================================
 #  GENIE  (AI/BI Genie Conversation API)
 # ============================================================================
+def _genie_text_content(text_att):
+    """
+    Return the human-readable string from a Genie text attachment, whatever the
+    API version nests it as. Handles: a plain string; {"content": "..."};
+    {"content": {"text": "..."}}; or a list of such. Never returns a dict, so the
+    answer can't render as "[object Object]".
+    """
+    def pluck(v):
+        if v is None:
+            return ""
+        if isinstance(v, str):
+            return v
+        if isinstance(v, dict):
+            # common nestings: content / text / value / string_value
+            for k in ("content", "text", "value", "string_value", "message"):
+                if k in v:
+                    got = pluck(v[k])
+                    if got:
+                        return got
+            return ""
+        if isinstance(v, (list, tuple)):
+            return "\n".join(s for s in (pluck(x) for x in v) if s)
+        return str(v)
+
+    if isinstance(text_att, str):
+        return text_att.strip()
+    if isinstance(text_att, dict):
+        return pluck(text_att.get("content", text_att)).strip()
+    return pluck(text_att).strip()
+
+
+def _parse_genie_query_result(body):
+    """
+    Pull (columns, rows) out of a Genie query-result response, tolerating the
+    shapes the endpoint returns:
+      - {"statement_response": {"manifest": {...}, "result": {"data_array": [...]}}}
+      - {"manifest": {...}, "result": {...}}   (already unwrapped)
+      - result rows under "data_array" or "data"
+    Returns ([], []) when nothing usable is present (card then shows no table).
+    """
+    if not isinstance(body, dict):
+        return [], []
+    sr = body.get("statement_response") or body
+    manifest = sr.get("manifest") or {}
+    schema = manifest.get("schema") or {}
+    cols = [c.get("name") for c in (schema.get("columns") or []) if c.get("name")]
+
+    result = sr.get("result") or {}
+    data = result.get("data_array")
+    if data is None:
+        data = result.get("data")           # alternate key
+    if data is None and isinstance(sr.get("data_array"), list):
+        data = sr["data_array"]             # occasionally top-level
+    data = data or []
+
+    # If columns are missing but we have rows, synthesize positional names.
+    if not cols and data and isinstance(data[0], (list, tuple)):
+        cols = [f"col_{i+1}" for i in range(len(data[0]))]
+
+    rows = []
+    for row in data:
+        if isinstance(row, dict):
+            rows.append(row)                # already keyed
+        elif isinstance(row, (list, tuple)):
+            rows.append(dict(zip(cols, row)))
+    return cols, rows
+
+
 def genie_ask(question: str):
     """
     Start a Genie conversation, poll for completion, and return the generated
@@ -536,10 +604,14 @@ def genie_ask(question: str):
     "Authorization": f"Bearer {CONFIG['DATABRICKS_TOKEN']}",
     "Content-Type": "application/json"
 }
-    # 1. start conversation
+    log.info({CONFIG['GENIE_SPACE_ID']})
+    # 1. start conversation (enable_visualization asks Genie to also decide on a
+    #    visualization; the viz attachment it returns carries only a title +
+    #    source-query id — no chart spec — so synthesis infers type/axes.)
     start = requests.post(f"{base}/start-conversation",
                           headers= headers,
-                          json={"content": question}, timeout=60, verify=VERIFY_SSL)
+                          json={"content": question, "enable_visualization": True},
+                          timeout=60, verify=VERIFY_SSL)
     start.raise_for_status()
     sb = start.json()
     conversation_id = sb["conversation_id"]
@@ -561,31 +633,55 @@ def genie_ask(question: str):
 
     if status != "COMPLETED":
         return {"status": status or "UNKNOWN", "text": mb.get("error", "Genie did not complete."), "sql": None, "rows": []}
-
-    # 3. pull text + any attached query (SQL + results)
+    # 3. pull text + any attached query (SQL + results) + Genie's viz attachment
+    #    NOTE: Genie's viz attachment is a SEPARATE entry in `attachments` (type
+    #    GenieVizAttachment). It carries only { title, query_attachment_id,
+    #    attachment_id } — there is NO chart-type/encoding spec in the API — so we
+    #    capture the title + the id of the query it belongs to, and let synthesis
+    #    infer the chart type/axes from the data shape and the generated SQL.
     text_parts, sql, rows, cols = [], None, [], []
+    viz = None                 # {"title", "query_attachment_id"} when Genie suggests one
+    query_attachment_id = None
     for att in mb.get("attachments", []):
-        if "text" in att and att["text"].get("content"):
-            text_parts.append(att["text"]["content"])
+        # TEXT — the content field can be a plain string or a nested object
+        # depending on API version; coerce to a clean string either way so the
+        # answer never renders as "[object Object]".
+        if "text" in att and att["text"]:
+            t = _genie_text_content(att["text"])
+            if t:
+                text_parts.append(t)
+        if "viz" in att and att["viz"]:
+            v = att["viz"]
+            viz = {
+                "title": v.get("title"),
+                "query_attachment_id": v.get("query_attachment_id"),
+                "suggested": True,          # Genie decided a chart was warranted
+            }
         if "query" in att and att["query"]:
             sql = att["query"].get("query")
             attachment_id = att["attachment_id"]
+            query_attachment_id = query_attachment_id or attachment_id
             # fetch the materialized result for this query attachment
             res_url = f"{msg_url}/attachments/{attachment_id}/query-result"
-            rr = requests.get(res_url, headers=_headers(), timeout=60, verify=VERIFY_SSL)
-            if rr.ok:
-                rb = rr.json().get("statement_response", {})
-                man = rb.get("manifest", {})
-                cols = [c["name"] for c in man.get("schema", {}).get("columns", [])]
-                data = rb.get("result", {}).get("data_array", []) or []
-                rows = [dict(zip(cols, row)) for row in data]
+            try:
+                rr = requests.get(res_url, headers=_headers(), timeout=60, verify=VERIFY_SSL)
+                if rr.ok:
+                    cols, rows = _parse_genie_query_result(rr.json())
+            except Exception as e:
+                log.warning("genie query-result fetch failed: %s", e)
 
+    # Only keep the viz hint if it actually points at the query we charted (or if
+    # Genie didn't specify a target). Guards against a stale/mismatched id.
+    if viz and viz.get("query_attachment_id") and query_attachment_id \
+       and viz["query_attachment_id"] != query_attachment_id:
+        viz = None
     return {
         "status": "COMPLETED",
         "text": "\n".join(text_parts).strip(),
         "sql": sql,
         "columns": cols,
         "rows": rows[:200],
+        "viz": viz,               # Genie's suggested visualization (may be None)
         "conversation_id": conversation_id,
     }
 
@@ -607,16 +703,16 @@ HITL_CONF = int(os.environ.get("HITL_CONF", "65"))  # confidence below this -> H
 # Whether we have enough config to talk to a live warehouse. The uploaded
 # CONFIG ships dummy values, so we only treat it as live when the token and
 # warehouse id have been overridden away from their dummy defaults.
-LIVE = not (
-    CONFIG["DATABRICKS_TOKEN"].startswith("dapiXXXX")
-    or CONFIG["WAREHOUSE_ID"] == "0123456789abcdef"
-    or CONFIG["DATABRICKS_HOST"].startswith("https://REPLACE-WORKSPACE")
-)
 # LIVE = not (
-#     get_env("DATABRICKS_TOKEN").startswith("dapiXXXX")
-#     or get_env("WAREHOUSE_ID") == "0123456789abcdef"
-#     or get_env("DATABRICKS_HOST").startswith("https://REPLACE-WORKSPACE")
+#     CONFIG["DATABRICKS_TOKEN"].startswith("dapiXXXX")
+#     or CONFIG["WAREHOUSE_ID"] == "0123456789abcdef"
+#     or CONFIG["DATABRICKS_HOST"].startswith("https://REPLACE-WORKSPACE")
 # )
+LIVE = not (
+    get_env("DATABRICKS_TOKEN").startswith("dapiXXXX")
+    or get_env("WAREHOUSE_ID") == "0123456789abcdef"
+    or get_env("DATABRICKS_HOST").startswith("https://REPLACE-WORKSPACE")
+)
 
 # Gold/base tables & views this app is allowed to touch — used for lineage
 # matching. Includes the two source tables plus the audit table.
@@ -1175,7 +1271,7 @@ def api_query():
 INSIGHTS_TABLE = get_env("DBX_INSIGHTS_TABLE", "ernest_insights")
 
 
-DASH_LIVE = LIVE
+DASH_LIVE = True
 # In-memory fallback store (also used to hold rows fetched for Delta insights).
 _INSIGHTS = []
 _insights_lock = threading.Lock()
@@ -1298,8 +1394,9 @@ def update_insight_chart(ins_id, chart_type: str):
     if DASH_LIVE:
         target = delta_id if delta_id is not None else ins_id
         try:
-            run_sql(f"UPDATE {insights_fqtn()} SET chart_type = '{_esc(chart_type,40)}' "
-                    f"WHERE insight_id = {int(target)}")
+            update_query = f"UPDATE {insights_fqtn()} SET chart_type = '{_esc(chart_type,40)}' WHERE insight_id = {int(target)}"
+            
+            run_sql(update_query)
         except Exception as e:
             log.warning("[dashboard] chart_type update failed: %s", e)
     return True

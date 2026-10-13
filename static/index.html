@@ -290,7 +290,7 @@ function renderForecast(){
   const horizons = [1,2,3,6,9,12];
 
   document.getElementById('main').innerHTML = `
-    <div class="topbar"><div><h1>Forecast <span class="tag">/ prediction</span></h1><div class="breadcrumb">Project a metric forward with an uncertainty band</div></div></div>
+    <div class="topbar"><div><h1>Forecast <span class="tag">Forecast / Prediction</span></h1><div class="breadcrumb">Project a metric forward with an uncertainty band</div></div></div>
     <div class="card">
       <div class="fc-controls">
         <div class="fc-field"><label>Metric</label>
@@ -344,7 +344,7 @@ function renderForecastResult(){
     </div>
     <div class="card">
       <h3>Answer</h3>
-      <div class="atext" style="font-size:14.5px;line-height:1.6;color:#333e49;">${escapeHtml(r.answer)}</div>
+      <div class="atext" style="font-size:14.5px;line-height:1.6;color:#333e49;">${escapeHtml(asText(r.answer))}</div>
     </div>
     <div class="card">
       <h3>Forecast detail <span class="tag">month by month</span></h3>
@@ -982,7 +982,7 @@ function renderGenieCard(item){
     return `<div class="genie-answer">
       <div class="qtext">${escapeHtml(item.question)}</div>
       ${badge}${fallback}
-      <div class="atext" style="font-size:13.5px;line-height:1.55;color:#333e49;">${escapeHtml(env.answer||'')}</div>
+      <div class="atext" style="font-size:13.5px;line-height:1.55;color:#333e49;">${escapeHtml(asText(env.answer))}</div>
       <div class="fc-mini"><canvas id="${chartId}"></canvas></div>
       ${selfCheckHtml(env.self_check)}
     </div>`;
@@ -1003,11 +1003,18 @@ function renderGenieCard(item){
     pinHtml = `<div style="margin-top:12px;text-align:right">
       <button class="pin-btn" onclick="pinInsight(${gi})">📌 Pin to Dashboard</button></div>`;
   }
+  // inline bar chart when the retrieval result is chartable (built server-side
+  // by synthesis._retrieval_chart and carried on env.chart)
+  const chartHtml = env.chart
+    ? `<div class="fc-mini"><canvas id="gcChart_${item.id}"></canvas></div>
+       ${env.chart.title?`<div class="small-muted" style="text-align:center;margin:-2px 0 6px;">${escapeHtml(env.chart.title)}</div>`:''}`
+    : '';
   return `<div class="genie-answer">
     <div class="qtext">${escapeHtml(item.question)}</div>
     ${badge}${fallback}
-    ${env.answer?`<div class="atext" style="font-size:13.5px;line-height:1.55;color:#333e49;margin-bottom:8px;">${escapeHtml(env.answer)}</div>`:''}
+    ${asText(env.answer)?`<div class="atext" style="font-size:13.5px;line-height:1.55;color:#333e49;margin-bottom:8px;">${escapeHtml(asText(env.answer))}</div>`:''}
     ${env.sql?`<div class="genie-sql">${escapeHtml(env.sql)}</div>`:''}
+    ${chartHtml}
     ${rowsHtml}
     ${selfCheckHtml(env.self_check)}
   </div>`;
@@ -1073,6 +1080,52 @@ function drawCardChart(item){
   });
 }
 
+// Draw the inline retrieval chart for a card (bar chart of the returned rows).
+// Mirrors drawCardChart(): reads env.chart, targets the card's <canvas>, and
+// registers into the shared `charts` map so repaints don't leak instances.
+function drawRetrievalChart(item){
+  const env = item.result||{};
+  if(env.kind!=='retrieval' || !env.chart) return;
+  const el = document.getElementById('gcChart_'+item.id);
+  if(!el || typeof Chart==='undefined') return;
+  const c = env.chart;
+  // Chart type is chosen server-side (synthesis._retrieval_chart): 'line' for a
+  // time/period axis (a trend), 'bar' for categories (a comparison).
+  const chartType = c.type === 'line' ? 'line' : 'bar';
+  const palette = ['#0fb5ae','#0b2545','#f2a900','#6b5b95','#d1495b'];
+  const hexToRgba = (hex,a)=>{ const n=parseInt(hex.slice(1),16);
+    return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')'; };
+  const datasets = (c.series||[]).map((s,i)=>{
+    const col = palette[i % palette.length];
+    if(chartType === 'line'){
+      return { label: s.name, data: s.values,
+        borderColor: col, backgroundColor: hexToRgba(col,0.12),
+        borderWidth: 2, pointRadius: 2, tension: .3,
+        fill: (c.series||[]).length===1 };
+    }
+    return { label: s.name, data: s.values,
+      backgroundColor: col, borderRadius: 3, maxBarThickness: 34 };
+  });
+  const money = !!c.money;
+  const key = 'gcChart_'+item.id;
+  if(charts[key]){ try{charts[key].destroy();}catch(e){} }
+  charts[key] = new Chart(el,{ type: chartType,
+    data:{ labels: c.labels||[], datasets },
+    options:{ responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{ legend:{ display: datasets.length>1, labels:{font:{size:9},boxWidth:10} },
+        tooltip:{ callbacks:{ label:(ctx)=>{
+          const v=ctx.parsed.y; const val = money? fmtMoney(v) : (Math.abs(v)>=1000? v.toLocaleString() : v);
+          return ' '+ctx.dataset.label+': '+val; } } } },
+      scales:{ y:{ beginAtZero: chartType==='bar', ticks:{ font:{size:9},
+          callback:(v)=> money? fmtMoney(v) : (Math.abs(v)>=1000? (v/1000)+'k' : v) } },
+        x:{ ticks:{ font:{size:8}, maxRotation:0, autoSkip:true, maxTicksLimit:8 } } } }
+  });
+}
+function asText(v){ if(v==null) return ''; if(typeof v==='string') return v;
+  if(typeof v==='object'){ for(const k of ['content','text','value','message','answer']){ if(k in v) return asText(v[k]); } return ''; }
+  return String(v); }
+
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 let GC_SEQ = 0;
@@ -1104,7 +1157,11 @@ function paintGenie(){
   const el = document.getElementById('genieResults');
   if(!el) return;
   el.innerHTML = GENIE_HISTORY.map(renderGenieCard).join('');
-  GENIE_HISTORY.forEach(it=>{ if(it.result && it.result.kind==='prediction') drawCardChart(it); });
+  GENIE_HISTORY.forEach(it=>{
+    if(!it.result) return;
+    if(it.result.kind==='prediction') drawCardChart(it);
+    else if(it.result.kind==='retrieval' && it.result.chart) drawRetrievalChart(it);
+  });
 }
 
 // ================= MY DASHBOARD (saved insights) =================

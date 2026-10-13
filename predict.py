@@ -11,13 +11,16 @@ Design notes tied to the spec:
   * TabPFN is SELF-HOSTED and NON-NEGOTIABLE: we run the open-source `tabpfn`
     pip package in-process (CPU is fine for dashboard row counts). We NEVER
     call Prior Labs' hosted API.
-  * The TabPFN weights are gated on HuggingFace. When TABPFN_ENABLED=true and a
-    HF token is present, we use the real TabPFNRegressor. Otherwise we fall back
-    to a transparent statistical forecaster (trend + seasonal + residual band)
-    so the prototype runs end-to-end today. The interface is identical, so
-    switching to real TabPFN is a config flip, not a rewrite.
-  * Each step is a small, single-purpose function — not one giant prompt —
-    exactly as the spec's risk section recommends.
+  * TabPFN weights are gated under a NON-COMMERCIAL license. Authorization is
+    done through the PriorLabs portal, NOT a HuggingFace "accept" button (the
+    library's error message is misleading on this point). Provide the credential
+    via TABPFN_TOKEN (a PriorLabs API key); HF_TOKEN is also honored as a
+    fallback for HuggingFace-hosted downloads. When TABPFN_ENABLED=true and a
+    token is present we use the real TabPFNRegressor; otherwise we fall back to a
+    transparent statistical forecaster (trend + seasonal + residual band) so the
+    app runs end-to-end with no license. The interface is identical, so switching
+    to real TabPFN is a config flip, not a rewrite.
+
 
 This module is imported by app.py, which supplies run_sql() and fqtn().
 """
@@ -32,6 +35,25 @@ log = logging.getLogger("ernest.predict")
 # boots even when weights aren't provisioned.
 TABPFN_ENABLED = os.environ.get("TABPFN_ENABLED", "false").lower() == "true"
 TABPFN_HORIZON_MAX = 12
+
+# Authorization credentials. TABPFN_TOKEN is the PriorLabs API key (primary,
+# what the library actually gates on); HF_TOKEN covers HuggingFace-hosted
+# downloads. Either being present is enough to attempt the real model.
+TABPFN_TOKEN = os.environ.get("TABPFN_TOKEN")
+HF_TOKEN = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+TABPFN_DEVICE = os.environ.get("TABPFN_DEVICE", "cpu")
+# Optional: load weights from a local dir / mounted Volume instead of downloading
+# (Databricks Phase-2 shape — fully self-hosted, no runtime call to PriorLabs/HF).
+TABPFN_MODEL_PATH = os.environ.get("TABPFN_MODEL_PATH")
+# Pin a specific checkpoint to control the model VERSION and, in an offline /
+# locked-down environment, to load directly from a local file with no network.
+# Accepts a full path to a .ckpt/.safetensors file OR a filename resolved inside
+# TABPFN_MODEL_CACHE_DIR. This is the recommended offline setup:
+#   TABPFN_ENABLED=true
+#   TABPFN_REGRESSOR_CKPT=C:\path\to\Downloads\tabpfn-v3-regressor.ckpt
+# When a local checkpoint or cache dir is set, the code forces HF_HUB_OFFLINE=1
+# so the library loads from disk and never attempts a (blocked) download.
+TABPFN_REGRESSOR_CKPT = os.environ.get("TABPFN_REGRESSOR_CKPT")
 
 
 # ---------------------------------------------------------------------------
@@ -200,24 +222,63 @@ def tabpfn_forecast(feat: dict, horizon: int) -> dict:
 
     if TABPFN_ENABLED:
         try:
-            log.info("tabpfn enabled")
+            log.info("TABPFN_TOKEN present: %s", bool(os.environ.get("TABPFN_TOKEN")))
             return _tabpfn_real(feat, horizon)
         except Exception as e:
             log.warning("TabPFN unavailable (%s); using statistical fallback", e)
 
-    log.info("tabpfn disabled")
     return _statistical_forecast(feat, horizon)
 
 
 def _tabpfn_real(feat: dict, horizon: int) -> dict:
     """Real self-hosted TabPFN regressor with quantile output."""
     import numpy as np
+
+    # Make credentials visible to the tabpfn library, which reads them from the
+    # environment at import/first-use. Set both names it may look for.
+    if TABPFN_TOKEN:
+        os.environ.setdefault("TABPFN_TOKEN", TABPFN_TOKEN)
+    if HF_TOKEN:
+        os.environ.setdefault("HF_TOKEN", HF_TOKEN)
+        os.environ.setdefault("HUGGING_FACE_HUB_TOKEN", HF_TOKEN)
+    # Never open the interactive browser login on a server; require a token.
+    # TABPFN_NO_BROWSER=1 is PriorLabs' official flag to disable interactive login.
+    os.environ.setdefault("TABPFN_NO_BROWSER", "1")
+
+    # A local checkpoint file or cache dir counts as a valid, self-hosted source —
+    # no token needed in that case.
+    have_local = bool(TABPFN_REGRESSOR_CKPT or TABPFN_MODEL_PATH)
+    if not (TABPFN_TOKEN or HF_TOKEN or have_local):
+        raise RuntimeError(
+            "TabPFN enabled but no source found. Set TABPFN_REGRESSOR_CKPT to a "
+            "local checkpoint file, or TABPFN_MODEL_PATH to a weights folder, or "
+            "TABPFN_TOKEN / HF_TOKEN to download. Authorize at the PriorLabs "
+            "portal, not a HuggingFace accept button."
+        )
+
+    # Offline / self-hosted weights: when loading from local files, force offline
+    # mode so the library never attempts a network download (which would fail on
+    # a locked-down box). TABPFN_MODEL_CACHE_DIR points at a pre-downloaded folder;
+    # HF_HUB_OFFLINE=1 hard-disables HuggingFace network calls.
+    if TABPFN_MODEL_PATH:
+        os.environ.setdefault("TABPFN_MODEL_CACHE_DIR", TABPFN_MODEL_PATH)
+    if have_local:
+        os.environ.setdefault("HF_HUB_OFFLINE", "1")
+        os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+
     from tabpfn import TabPFNRegressor
 
     X = np.array(feat["X"], dtype=float)
     y = np.array(feat["y"], dtype=float)
 
-    reg = TabPFNRegressor(device=os.environ.get("TABPFN_DEVICE", "cpu"))
+    # Load the regressor. When a specific checkpoint is pinned (your offline
+    # setup), load exactly that file — a full path or a filename resolved within
+    # TABPFN_MODEL_CACHE_DIR. This keeps the version fixed to the one you have and
+    # avoids defaulting to a newer generation that would need a download.
+    if TABPFN_REGRESSOR_CKPT:
+        reg = TabPFNRegressor(device=TABPFN_DEVICE, model_path=TABPFN_REGRESSOR_CKPT)
+    else:
+        reg = TabPFNRegressor(device=TABPFN_DEVICE)
     reg.fit(X, y)
 
     # Build future feature rows, rolling lag features forward as we predict.
