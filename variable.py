@@ -10,7 +10,7 @@ try:
 # Fallback to empty dict if file is missing (e.g., in production)
 except FileNotFoundError:
     yaml_config = {}
-log.info(yaml_config)
+print.info(yaml_config)
 def get_env(key, default=None):
     # Check local YAML first, fallback to system environment variables
     return yaml_config.get(key, os.environ.get(key, default))
