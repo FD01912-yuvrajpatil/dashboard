@@ -273,7 +273,6 @@ def _call_anthropic(system: str, user: str):
     #key = os.environ.get("ANTHROPIC_API_KEY")
     key = (os.environ.get("ANTHROPIC_API_KEY") or "").strip().strip('"').strip("'")
     log.info("PLANNER_MODEL=%r", PLANNER_MODEL)
-    log.info(key)
     if not key:
         raise RuntimeError("ANTHROPIC_API_KEY is empty in this process — the env var "
                         "isn't set where the server runs.")
@@ -299,7 +298,6 @@ def _call_anthropic(system: str, user: str):
     r.raise_for_status()
     body = r.json()
     parts = [b.get("text", "") for b in body.get("content", []) if b.get("type") == "text"]
-    log.info("".join(parts).strip())
     return "".join(parts).strip()
 
 

@@ -32,6 +32,25 @@ list total sum count average number over next last did get had have please tell
 """.split())
 
 
+def _as_text(v):
+    """Coerce any answer-ish value to a clean string so the UI never shows
+    '[object Object]'. Mirrors the backend's text coercion as defense in depth."""
+    if v is None:
+        return ""
+    if isinstance(v, str):
+        return v
+    if isinstance(v, dict):
+        for k in ("content", "text", "value", "string_value", "message", "answer"):
+            if k in v:
+                got = _as_text(v[k])
+                if got:
+                    return got
+        return ""
+    if isinstance(v, (list, tuple)):
+        return "\n".join(s for s in (_as_text(x) for x in v) if s)
+    return str(v)
+
+
 # ---------------------------------------------------------------------------
 # UNIFY
 # ---------------------------------------------------------------------------
@@ -41,6 +60,7 @@ def unify(question: str, kind: str, payload: dict, routing: dict) -> dict:
     kind == 'prediction' -> payload is the run_prediction() result
     Returns the unified envelope.
     """
+    log.info("payload", payload)
     if kind == "prediction":
         env = _unify_prediction(question, payload)
     else:
@@ -57,18 +77,235 @@ def unify(question: str, kind: str, payload: dict, routing: dict) -> dict:
 
 def _unify_retrieval(question, g):
     g = g or {}
+    columns = g.get("columns") or []
+    rows = g.get("rows") or []
+    sql = g.get("sql") or ""
+    viz = g.get("viz")            # {title, query_attachment_id, suggested} or None
+
+    # Option B (realistic + SQL-aware): Genie's conversation API returns NO
+    # chart-type/encoding spec — its viz attachment carries only a title and the
+    # id of the query it came from. So we treat viz as a *signal* ("Genie thinks
+    # this is worth charting") and borrow its title, then INFER the chart type and
+    # axes from the data shape and the generated SQL. The envelope is the same one
+    # drawRetrievalChart() already renders, so the front-end is unchanged.
+    chart = _retrieval_chart(question, columns, rows, sql=sql, viz=viz)
+
     return {
-        "answer": g.get("text") or "",
+        "answer": _as_text(g.get("text")),
         #"sql": g.get("sql"),
         "table": {
-            "columns": g.get("columns") or [],
-            "rows": g.get("rows") or [],
-        } if g.get("rows") else None,
+            "columns": columns,
+            "rows": rows,
+        } if rows else None,
         "prediction": None,
         "uncertainty": None,
-        "chart": None,
+        # chart payload the front-end's drawRetrievalChart() understands.
+        # None when the result isn't chartable.
+        "chart": chart,
         "engine": "genie",
     }
+
+
+# --- SQL-aware helpers (B-plus) --------------------------------------------
+_SQL_GROUPBY_RE = re.compile(r"\bGROUP\s+BY\b(.+?)(?:\bORDER\s+BY\b|\bLIMIT\b|\bHAVING\b|$)",
+                             re.IGNORECASE | re.DOTALL)
+_SQL_ORDERBY_RE = re.compile(r"\bORDER\s+BY\b(.+?)(?:\bLIMIT\b|$)", re.IGNORECASE | re.DOTALL)
+_SQL_HAS_LIMIT_RE = re.compile(r"\bLIMIT\s+\d+", re.IGNORECASE)
+
+
+def _sql_group_cols(sql):
+    """Column/expression names appearing in GROUP BY (the natural label axis)."""
+    if not sql:
+        return []
+    m = _SQL_GROUPBY_RE.search(sql)
+    if not m:
+        return []
+    return _split_sql_cols(m.group(1))
+
+
+def _sql_order_desc(sql):
+    """True if the query is ordered descending — a ranking, best shown as bars."""
+    if not sql:
+        return False
+    m = _SQL_ORDERBY_RE.search(sql)
+    return bool(m and re.search(r"\bDESC\b", m.group(1), re.IGNORECASE))
+
+
+def _split_sql_cols(fragment):
+    """Pull bare column names out of a GROUP BY / ORDER BY fragment."""
+    cols = []
+    for part in fragment.split(","):
+        p = part.strip()
+        # drop ASC/DESC and table qualifiers; ignore pure ordinals (GROUP BY 1)
+        p = re.sub(r"\b(ASC|DESC)\b", "", p, flags=re.IGNORECASE).strip()
+        p = p.split()[0] if p.split() else p
+        if "." in p:
+            p = p.split(".")[-1]
+        p = p.strip("`\"[]()")
+        if p and not p.isdigit():
+            cols.append(p)
+    return cols
+
+
+def _retrieval_chart(question, columns, rows, sql="", viz=None):
+    """
+    Build a chart spec from a retrieval result when it is chartable: one usable
+    label column + at least one numeric column, with a small-enough row count.
+    Returns None otherwise so the card just shows the table.
+
+    Option B inputs:
+      sql  — Genie's generated SQL. Its GROUP BY picks the label axis and its
+             ORDER BY ... DESC signals a ranking (→ bar). (B-plus)
+      viz  — Genie's viz attachment {title, suggested}. Used only as a signal
+             that Genie wanted a chart, and to borrow its title. (B-realistic)
+
+    Shape (mirrors the forecast 'chart' contract — a self-describing dict):
+        { "type": "bar", "labels": [...], "series": [{"name","values"}],
+          "label_col": str, "value_cols": [...], "money": bool, "title": str,
+          "source": "genie"|"heuristic" }
+    """
+    if not rows:
+        return None
+
+    cols = list(columns) if columns else list(rows[0].keys())
+    if not cols:
+        return None
+
+    # Classify columns as numeric vs text by sampling the rows.
+    sample = rows[:50]
+    numeric_cols, text_cols = [], []
+    for c in cols:
+        vals = [r.get(c) for r in sample if r.get(c) is not None and r.get(c) != ""]
+        if not vals:
+            continue
+        if sum(1 for v in vals if _is_number(v)) >= max(1, int(0.8 * len(vals))):
+            numeric_cols.append(c)
+        else:
+            text_cols.append(c)
+
+    # A numeric column can still be the time axis (e.g. a bare year like 2023).
+    # If there's no text label but a numeric column reads as temporal, promote it
+    # to the label axis so a year-over-year result charts as a line.
+    if not text_cols and numeric_cols:
+        for c in list(numeric_cols):
+            col_vals = [str(r.get(c)) for r in sample if r.get(c) not in (None, "")]
+            if _looks_temporal(c, col_vals):
+                numeric_cols.remove(c)
+                text_cols.append(c)
+                break
+
+    if not numeric_cols or not text_cols:
+        return None
+
+    # Too many bars is unreadable; too few rows isn't worth a chart.
+    n = len(rows)
+    if n < 2 or n > 30:
+        return None
+
+    # B-plus: if Genie's SQL grouped by a column we have, use it as the label
+    # axis — that's the dimension Genie actually aggregated over. Else first text.
+    group_cols = [c for c in _sql_group_cols(sql) if c in text_cols]
+    label_col = group_cols[0] if group_cols else text_cols[0]
+    # Numeric measures, label column excluded if it was promoted (e.g. a year).
+    value_cols = [c for c in numeric_cols if c != label_col][:3]
+    if not value_cols:
+        return None
+
+    # A distinct label per row keeps the bar chart meaningful.
+    labels = [str(r.get(label_col, "")) for r in rows]
+    if len(set(labels)) < 2:
+        return None
+
+    series = [{
+        "name": vc.replace("_", " "),
+        "values": [_to_number(r.get(vc)) for r in rows],
+    } for vc in value_cols]
+
+    money = any(_looks_money(vc) for vc in value_cols)
+
+    # Chart type: a time/period axis reads best as a line (a trend). But an
+    # explicitly ranked query (ORDER BY ... DESC, often with LIMIT) is a
+    # top-N comparison — keep that as bars even if the labels look date-ish.
+    temporal = _looks_temporal(label_col, labels)
+    ranked = _sql_order_desc(sql)
+    chart_type = "line" if (temporal and not ranked) else "bar"
+
+    # Title: borrow Genie's viz title when it gave one; else synthesize.
+    genie_title = (viz or {}).get("title") if isinstance(viz, dict) else None
+    connector = " over " if chart_type == "line" else " by "
+    title = (genie_title
+             or value_cols[0].replace("_", " ") + connector + label_col.replace("_", " "))
+
+    # Provenance: 'genie' when Genie suggested the viz, else our heuristic.
+    source = "genie" if (isinstance(viz, dict) and viz.get("suggested")) else "heuristic"
+
+    return {
+        "type": chart_type,
+        "labels": labels,
+        "series": series,
+        "label_col": label_col,
+        "value_cols": value_cols,
+        "money": money,
+        "title": title,
+        "source": source,
+    }
+
+
+def _is_number(v):
+    if isinstance(v, bool):
+        return False
+    if isinstance(v, (int, float)):
+        return True
+    try:
+        float(str(v).replace(",", "").replace("$", "").replace("%", "").strip())
+        return True
+    except (ValueError, AttributeError):
+        return False
+
+
+def _to_number(v):
+    try:
+        return float(str(v).replace(",", "").replace("$", "").replace("%", "").strip())
+    except (ValueError, AttributeError):
+        return 0.0
+
+
+def _looks_money(col):
+    c = (col or "").lower()
+    return any(k in c for k in ("revenue", "amount", "cost", "gtm", "price", "sales", "$", "dollar", "spend"))
+
+
+_MONTHS = ("jan", "feb", "mar", "apr", "may", "jun",
+           "jul", "aug", "sep", "oct", "nov", "dec")
+# YYYY-MM / YYYY/MM, YYYY-MM-DD, Qn YYYY / YYYY Qn, or a bare 4-digit year.
+_DATEISH_RE = re.compile(
+    r"^\s*(\d{4}[-/]\d{1,2}([-/]\d{1,2})?|q[1-4][\s-]?\d{2,4}|\d{2,4}[\s-]?q[1-4]|\d{4})\s*$",
+    re.IGNORECASE,
+)
+
+
+def _looks_temporal(label_col, labels):
+    """
+    True when the label axis is a time/period axis, so the chart should be a
+    line. Decided by the column name OR by the actual label values (month names,
+    YYYY-MM, quarters, years). Value-based detection means it works even when the
+    column is named generically (e.g. 'period').
+    """
+    name = (label_col or "").lower()
+    if any(k in name for k in ("month", "date", "period", "quarter", "year", "week", "day", "time")):
+        return True
+
+    vals = [str(v).strip().lower() for v in (labels or []) if str(v).strip()]
+    if not vals:
+        return False
+
+    def is_time_value(v):
+        if v[:3] in _MONTHS:            # 'Jan', 'January', 'Mar-2024'
+            return True
+        return bool(_DATEISH_RE.match(v))
+
+    hits = sum(1 for v in vals if is_time_value(v))
+    return hits >= max(2, int(0.6 * len(vals)))
 
 
 def _unify_prediction(question, p):
@@ -91,7 +328,7 @@ def _unify_prediction(question, p):
         "money": p.get("money"),
     }
     return {
-        "answer": p.get("answer") or "",
+        "answer": _as_text(p.get("answer")),
         #"sql": None,
         "table": None,
         "prediction": {
