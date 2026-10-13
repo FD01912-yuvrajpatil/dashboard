@@ -14,7 +14,7 @@ env:
    DBX_SALES_TABLE: "sales_data_updated"
    DBX_INVENTORY_TABLE : "inventory_data_curated"
    DATABRICKS_HOST: "https://adb-7405607280061101.1.azuredatabricks.net"
-   DATABRICKS_TOKEN: "dapie14d6a02c0a241dfe2ea1a34a26e6414-3"
+   DATABRICKS_TOKEN: "dapiecb1d6a1a539a1a2cc6f4fad871cec93-3"
    DATABRICKS_WAREHOUSE_ID: "f10214f943eb8d3a"
    GENIE_SPACE_ID: "01f19fd047b01ddaa13e58c7d48db5a5"
    DBX_INSIGHTS_TABLE: "ernest_insights"

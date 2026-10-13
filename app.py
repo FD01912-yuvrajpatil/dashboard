@@ -56,10 +56,9 @@ CONFIG = {
     "WORKSPACE_ID":     get_env("DATABRICKS_WORKSPACE_ID", "7405610968279077"),   # dummy
     "GENIE_SPACE_ID":   get_env("GENIE_SPACE_ID",          "01f19fd047b01ddaa13e58c7d48db5a5"),  # dummy
     "WAREHOUSE_ID":     get_env("DATABRICKS_WAREHOUSE_ID", "f10214f943eb8d3a"),   # dummy SQL warehouse
-
     # Auth token. On Databricks Apps, prefer the injected OAuth token; locally
     # you can drop a PAT here or in the DATABRICKS_TOKEN env var.
-    "DATABRICKS_TOKEN": get_env("DATABRICKS_TOKEN", "dapie14d6a02c0a241dfe2ea1a34a26e6414-3 "),  # dummy
+    "DATABRICKS_TOKEN": get_env("DATABRICKS_TOKEN", "dapiecb1d6a1a539a1a2cc6f4fad871cec93-3"),  # dummy
 
     # Unity Catalog location of your two tables.
     "CATALOG": get_env("DBX_CATALOG", "ernest_dashbord_poc"),
@@ -73,6 +72,76 @@ CONFIG = {
 def fqtn(table: str) -> str:
     """Fully-qualified table name: workspace.sss.<table>."""
     return f"`{CONFIG['CATALOG']}`.`{CONFIG['SCHEMA']}`.`{table}`"
+
+
+# ===========================================================================
+#  ROLE-BASED VIEW FILTERING  (demo-grade, Option 1)
+#  ---------------------------------------------------------------------------
+#  Scopes the DASHBOARD/PORTFOLIO payload by role. Admin sees everything; a
+#  Sales Rep sees only an allow-listed set of clients.
+#
+#  SECURITY NOTE: this is a *view filter*, not an access-control boundary. The
+#  role arrives from the browser, so a user could call the API with role=admin.
+#  For real per-user restriction this moves to Unity Catalog row filters with
+#  on-behalf-of-user identity (see SALES_REP_CLIENTS -> UC row filter later).
+#  The Genie 'ask' path is intentionally NOT filtered here (per POC scope).
+# ===========================================================================
+VALID_ROLES = ("admin", "sales_rep")
+
+# Hard-coded demo allow-list. EDIT THESE to match real client names/IDs exactly
+# as they appear in the dashboard payload's `clients` keys (Sold-To_Party3).
+# Comma-separated override via env SALES_REP_CLIENTS without touching code.
+SALES_REP_CLIENTS = [
+    c.strip() for c in os.environ.get(
+        "SALES_REP_CLIENTS",
+        "Apex Logistics,BluePeak Medical"      # <-- replace with your real demo clients
+    ).split(",") if c.strip()
+]
+
+
+def normalize_role(raw) -> str:
+    """Coerce an incoming role value to a known role; default to admin-safe?
+    No — default to the MORE restrictive role so a missing/unknown role never
+    accidentally exposes everything. Admin must be explicitly requested."""
+    r = (raw or "").strip().lower().replace("-", "_").replace(" ", "_")
+    return r if r in VALID_ROLES else "sales_rep"
+
+
+def allowed_clients_for_role(role: str, all_clients):
+    """Return the set of client keys a role may see, intersected with what
+    actually exists in the payload (so a typo in the allow-list just shows
+    fewer clients rather than erroring)."""
+    if role == "admin":
+        return set(all_clients)
+    existing = {str(c) for c in all_clients}
+    # case-insensitive match so 'Acme Corp' matches 'ACME CORP'
+    lower_map = {c.lower(): c for c in existing}
+    allowed = set()
+    for name in SALES_REP_CLIENTS:
+        key = lower_map.get(name.lower())
+        if key:
+            allowed.add(key)
+    return allowed
+
+
+def filter_payload_by_role(payload: dict, role: str) -> dict:
+    """Keep only permitted clients across clients/insights/battlecards. Admin is
+    a no-op. Returns a shallow-filtered copy; `months` and other keys are kept."""
+    if role == "admin" or not isinstance(payload, dict):
+        return payload
+    clients = payload.get("clients") or {}
+    allowed = allowed_clients_for_role(role, clients.keys())
+
+    def keep(d):
+        return {k: v for k, v in (d or {}).items() if k in allowed}
+
+    out = dict(payload)
+    out["clients"] = keep(payload.get("clients"))
+    out["insights"] = keep(payload.get("insights"))
+    out["battlecards"] = keep(payload.get("battlecards"))
+    out["_role"] = role
+    out["_allowed_clients"] = sorted(allowed)
+    return out
 
 def _headers():
     return {
@@ -1027,13 +1096,17 @@ def api_config():
         "genie_space_id": CONFIG["GENIE_SPACE_ID"],
         "catalog": CONFIG["CATALOG"],
         "schema": CONFIG["SCHEMA"],
+        "roles": list(VALID_ROLES),
+        "sales_rep_clients": SALES_REP_CLIENTS,
     })
 
 
 @app.route("/api/data")
 def api_data():
     try:
-        return jsonify(build_dashboard_payload())
+        role = normalize_role(request.args.get("role"))
+        payload = build_dashboard_payload()
+        return jsonify(filter_payload_by_role(payload, role))
     except Exception as e:
         log.exception("data build failed")
         return jsonify({"error": str(e)}), 500

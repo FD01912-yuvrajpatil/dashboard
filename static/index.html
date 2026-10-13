@@ -148,7 +148,17 @@
   @media(max-width:1100px){ .genie-panel{width:300px;flex-basis:300px;} }
   /* ---- governance top-nav tabs ---- */
   .main-wrap{flex:1;display:flex;flex-direction:column;min-width:0;}
-  .topnav{display:flex;gap:4px;padding:0 24px;background:var(--card);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20;overflow-x:auto;}
+  .topnav{display:flex;align-items:center;gap:4px;padding:0 24px;background:var(--card);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20;overflow-x:auto;}
+  /* Top bar row: tabs on the left, role picker pinned to the right (just left
+     of the Genie panel). sticky so it stays visible while the main area scrolls. */
+  .topbar-row{display:flex;align-items:stretch;background:var(--card);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20;}
+  .topbar-row .topnav{flex:1;min-width:0;border-bottom:none;position:static;}
+  /* Role picker — sits at the right end of the top bar, outside the Genie panel */
+  .role-box{display:flex;align-items:center;gap:8px;padding:0 20px;flex-shrink:0;border-left:1px solid var(--border);}
+  .role-box select{padding:7px 10px;border:1px solid var(--border);border-radius:8px;font:inherit;font-size:12.5px;font-weight:600;color:var(--navy);background:#fff;cursor:pointer;}
+  .role-pill{font-size:10px;font-weight:800;padding:3px 9px;border-radius:20px;letter-spacing:.03em;text-transform:uppercase;}
+  .role-pill.admin{background:#cfe3ff;color:#123a6b;}
+  .role-pill.sales_rep{background:#ffe3a8;color:#7a5600;}
   .topnav .tab{padding:14px 16px 12px;font-size:13.5px;font-weight:600;color:var(--sub);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:.15s;}
   .topnav .tab:hover{color:var(--navy);}
   .topnav .tab.active{color:var(--navy);border-bottom-color:var(--orange);}
@@ -172,7 +182,10 @@
     <div class="client-switch" id="clientSwitch"></div>
   </div>
   <div class="main-wrap">
+    <div class="topbar-row">
     <div class="topnav" id="topNav"></div>
+      <div class="role-box" id="rolePicker"></div>
+    </div>
     <div class="main" id="main"></div>
   </div>
   <aside class="genie-panel" id="geniePanel">
@@ -196,7 +209,8 @@
 let DATA = null;
 let CLIENTS = [];
 
-let state = { client: CLIENTS[0], view: 'portfolio', shipTo: null };
+let state = { client: CLIENTS[0], view: 'portfolio', shipTo: null,
+              role: (function(){ try{ return localStorage.getItem('ernest_role')||'admin'; }catch(e){ return 'admin'; } })() };
 let charts = {};
 
 function fmtMoney(x, digits){ digits = digits===undefined?0:digits; return '$' + Number(x).toLocaleString(undefined,{minimumFractionDigits:digits,maximumFractionDigits:digits}); }
@@ -235,7 +249,6 @@ function renderTopNav(){
     ['guardrails','\uD83D\uDEE1 Guardrails'],
     ['audit','\uD83D\uDCCB Audit Trail'],
     ['lineage','\uD83D\uDD17 Lineage'],
-     ['dashboard','\uD83D\uDCCC My Dashboard'],
   ];
   const nav = document.getElementById('topNav');
   if(!nav) return;
@@ -243,6 +256,40 @@ function renderTopNav(){
     const active = key===state.view ? 'active':'';
     return `<div class="tab ${active}" onclick="setState({view:'${key}', shipTo:null})">${label}</div>`;
   }).join('');
+}
+
+// Role picker lives in the Genie panel header (always visible on the right).
+function renderRolePicker(){
+  const box = document.getElementById('rolePicker');
+  if(!box) return;
+  const roleLabel = state.role === 'admin' ? 'Admin' : 'Sales Rep';
+  box.innerHTML = `
+      <span class="role-pill ${state.role}">${roleLabel}</span>
+    <select id="roleSelect" onchange="onRoleChange(this.value)" title="Switch role view">
+        <option value="admin" ${state.role==='admin'?'selected':''}>Admin — all clients</option>
+        <option value="sales_rep" ${state.role==='sales_rep'?'selected':''}>Sales Rep — My clients</option>
+    </select>`;
+}
+
+// Switch role: refetch the (role-scoped) dashboard payload and re-render.
+async function onRoleChange(role){
+  const prev = state.role;
+  state.role = (role === 'admin') ? 'admin' : 'sales_rep';
+  try{ localStorage.setItem('ernest_role', state.role); }catch(e){}
+  renderRolePicker();           // reflect the new pill immediately
+  try{
+    await loadData();          // refetch /api/data?role=...
+  }catch(e){
+    alert('Could not switch role: ' + e.message); state.role = prev; renderRolePicker(); return;
+  }
+  if(!CLIENTS.length){
+    alert('No clients are visible for the Sales Rep demo view. '+
+          'Update the allow-list (SALES_REP_CLIENTS) to match real client names.');
+    state.role = prev; renderRolePicker(); await loadData();   // revert
+  }
+  // keep the selected client only if it's still visible to this role
+  if(!CLIENTS.includes(state.client)) state.client = CLIENTS[0] || null;
+  render();
 }
 
 function breadcrumb(){
@@ -290,7 +337,7 @@ function renderForecast(){
   const horizons = [1,2,3,6,9,12];
 
   document.getElementById('main').innerHTML = `
-    <div class="topbar"><div><h1>Forecast <span class="tag">Forecast / Prediction</span></h1><div class="breadcrumb">Project a metric forward with an uncertainty band</div></div></div>
+    <div class="topbar"><div><h1>Forecast <span class="tag">Forecast/Prediction</span></h1><div class="breadcrumb">Project a metric forward with an uncertainty band</div></div></div>
     <div class="card">
       <div class="fc-controls">
         <div class="fc-field"><label>Metric</label>
@@ -582,7 +629,7 @@ function renderShipTos(cd, ins){
             <div class="strow"><span>Product lines</span><b>${s.hierarchies.length}</b></div>
           </div>`).join('')}
       </div>
-      <div class="footer-note">Click any location to drill into its product mix, materials, and cost detail. AI-generated. Validate with a qualified professional.</div>
+      <div class="footer-note">.</div>
     `;
     return;
   }
@@ -667,7 +714,7 @@ function renderTrends(cd, ins){
       <table><thead><tr><th>Ship-To</th><th>Category Opportunity</th><th>Peer Locations Buying It</th><th>Avg Peer Revenue</th></tr></thead>
       <tbody>${ins.whitespace.map(w=>`<tr class="clickable" onclick="setState({view:'shiptos', shipTo:'${w.ship_to.replace(/'/g,"\\'")}'})"><td><b>${w.ship_to}</b></td><td>${w.hier}</td><td>${w.peer_count}</td><td>${fmtMoney(w.avg_peer_revenue)}</td></tr>`).join('') || '<tr><td colspan="4" class="small-muted">No whitespace gaps detected.</td></tr>'}</tbody></table>
     </div>
-    <div class="footer-note">.</div>
+    <div class="footer-note".</div>
   `;
 }
 
@@ -940,6 +987,7 @@ async function trackLineage(){
 let GENIE_HISTORY = [];
 
 function initGeniePanel(){
+  renderRolePicker();
   const suggestions = [
     "Forecast revenue next quarter",
     "Top 10 ship-to locations by revenue",
@@ -1326,13 +1374,27 @@ async function removeInsight(insId){
 
 
 // ---------------- BOOTSTRAP: fetch live data then render ----------------
-async function boot(){
-  try{
-    const res = await fetch('/api/data');
+// Fetch the (role-scoped) dashboard payload. Shared by boot() and onRoleChange().
+async function loadData(){
+  const res = await fetch('/api/data?role=' + encodeURIComponent(state.role));
     if(!res.ok){ const j = await res.json().catch(()=>({})); throw new Error(j.error || ('HTTP '+res.status)); }
     DATA = await res.json();
     CLIENTS = Object.keys(DATA.clients || {});
-    if(!CLIENTS.length) throw new Error('No client data returned from workspace.sss.');
+}
+
+async function boot(){
+  try{
+    await loadData();
+    if(!CLIENTS.length){
+      // A Sales Rep with no matching clients shouldn't look like a hard failure.
+      if(state.role === 'sales_rep'){
+        document.getElementById('loadingOverlay').innerHTML =
+          '<div class="load-err"><b>No clients assigned to this Sales Rep view.</b>'+
+          '<br><br>Switch to Admin, or update the demo allow-list (SALES_REP_CLIENTS).</div>';
+        return;
+      }
+      throw new Error('No client data returned from workspace.sss.');
+    }
     state.client = CLIENTS[0];
     document.getElementById('loadingOverlay').style.display = 'none';
     document.getElementById('appRoot').style.display = 'flex';
