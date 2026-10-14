@@ -10,7 +10,7 @@
   :root{
     --navy:#0b2545; --navy2:#123a6b; --teal:#0fb5ae; --orange:#f2622e;
     --bg:#f4f6f9; --card:#ffffff; --border:#e3e8ef; --text:#1c2733; --sub:#5b6b7c;
-    --green:#1a9e6b; --red:#d9463e; --amber:#e0a300;
+    --green:#1a9e6b; --red:#d9463e; --amber:#e0a300; --violet: #8764b8; --purple : #783fc7;
   }
   *{box-sizing:border-box;}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);}
@@ -70,7 +70,7 @@
   .bc-card h4{margin:0 0 10px;font-size:14px;color:var(--navy);display:flex;align-items:center;gap:8px;}
   .bc-card ul{margin:0;padding-left:18px;}
   .bc-card li{font-size:13.3px;line-height:1.55;margin-bottom:9px;color:#333e49;}
-  .bc-header{background:linear-gradient(120deg,var(--navy),var(--navy2));color:#fff;border-radius:14px;padding:22px 26px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;}
+  .bc-header{background:linear-gradient(120deg,var(--purple),var(--violet));color:#fff;border-radius:14px;padding:22px 26px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;}
   .bc-header .h-name{font-size:22px;font-weight:800;}
   .bc-header .h-sub{font-size:13px;color:#c7d6ea;margin-top:4px;}
   .bc-metrics{display:flex;gap:26px;}
@@ -194,8 +194,8 @@
   </div>
   <aside class="genie-panel" id="geniePanel">
     <div class="genie-panel-head">
-      <div class="gp-title">DATA ZEN <span class="gp-badge">AI/BI</span></div>
-      <div class="gp-sub">Retrieval &amp; forecasts &middot; auto-routed</div>
+      <div class="gp-title">INSIGHTRON <span class="gp-badge">AI/BI</span></div>
+      <div class="gp-sub">  </div>
     </div>
     <div class="genie-panel-body">
       <div class="genie-box">
@@ -515,7 +515,7 @@ function renderPortfolio(){
     <div class="topbar"><div><h1>Portfolio Analysis</h1><div class="breadcrumb">All clients &middot; ${clientKeys.length} accounts</div></div></div>
     <div class="kpis">
       <div class="kpi"><div class="label">Overall Revenue</div><div class="value">${fmtMoney(totRev)}</div><div class="small-muted">${months.length} months, all clients</div></div>
-      <div class="kpi"><div class="label">Overall GTM $</div><div class="value">${fmtMoney(totGtm)}</div><div class="small-muted">${fmtPct(blendedGtmPct)} blended margin</div></div>
+      <div class="kpi"><div class="label">Total GTM $</div><div class="value">${fmtMoney(totGtm)}</div><div class="small-muted">${fmtPct(blendedGtmPct)} blended margin</div></div>
       <div class="kpi"><div class="label">Total Clients</div><div class="value">${clientKeys.length}</div><div class="small-muted">Active accounts</div></div>
       <div class="kpi"><div class="label">Total Ship-To's</div><div class="value">${shipToSet.size}</div><div class="small-muted">Across all accounts</div></div>
     </div>
