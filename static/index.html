@@ -270,7 +270,7 @@ function renderRolePicker(){
   box.innerHTML = `
       <span class="role-pill ${state.role}">${roleLabel}</span>
     <select id="roleSelect" onchange="onRoleChange(this.value)" title="Switch role view">
-        <option value="admin" ${state.role==='admin'?'selected':''}>Admin — all clients</option>
+        <option value="admin" ${state.role==='admin'?'selected':''}>Admin — All Clients</option>
         <option value="sales_rep" ${state.role==='sales_rep'?'selected':''}>Sales Rep — My Clients</option>
     </select>`;
 }
