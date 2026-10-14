@@ -173,13 +173,13 @@
 <body>
 <div class="loading-overlay" id="loadingOverlay">
   <div class="spinner"></div>
-  <div class="msg" id="loadingMsg">Connecting to Databricks &middot; workspace.sss &hellip;</div>
+  <div class="msg" id="loadingMsg">Connecting to Databricks &middot;</div>
 </div>
 <div class="app" id="appRoot" style="display:none;">
   <div class="sidebar">
     <div class="brand">
       <div class="name">ERNEST</div>
-      <div class="sub">Account Intelligence &middot; Strategic Selling</div>
+      <div class="sub">Account Intelligence </div>
     </div>
     <div class="navsec">Analyze</div>
     <div id="navItems"></div>
@@ -194,7 +194,7 @@
   </div>
   <aside class="genie-panel" id="geniePanel">
     <div class="genie-panel-head">
-      <div class="gp-title">INSIGHTRON <span class="gp-badge">AI/BI</span></div>
+      <div class="gp-title">FULCRUM IQ <span class="gp-badge">AI/BI</span></div>
       <div class="gp-sub">  </div>
     </div>
     <div class="genie-panel-body">
@@ -1534,7 +1534,7 @@ async function boot(){
           '<br><br>Switch to Admin, or update the demo allow-list (SALES_REP_CLIENTS).</div>';
         return;
       }
-      throw new Error('No client data returned from workspace.sss.');
+      throw new Error('No client data returned from workspace.');
     }
     state.client = CLIENTS[0];
     document.getElementById('loadingOverlay').style.display = 'none';
@@ -1545,7 +1545,7 @@ async function boot(){
   }catch(e){
     document.getElementById('loadingOverlay').innerHTML =
       '<div class="load-err"><b>Could not load data.</b><br>'+escapeHtml(e.message)+
-      '<br><br>Check the SQL warehouse ID, token, and that workspace.sss.sales / inventory exist and are readable.</div>';
+      '<br><br>Check the SQL warehouse ID, token, and that workspace exist and are readable.</div>';
   }
 }
 boot();
